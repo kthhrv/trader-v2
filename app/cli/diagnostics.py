@@ -272,7 +272,7 @@ async def run_debug_search(term: str):
     """
     Searches for markets in IG.
     """
-    async with AsyncIGClient() as ig_client:
+    async with AsyncIGClient.get_instance() as ig_client:
         results = await ig_client.search_markets(term, env_type="DEMO")
         logger.info(f"Search Results: {results}")
 

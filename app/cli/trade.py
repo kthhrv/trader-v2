@@ -31,7 +31,7 @@ async def run_test_trade(
 
     epic = config["epic"]
 
-    async with AsyncIGClient() as ig_client:
+    async with AsyncIGClient.get_instance() as ig_client:
         try:
             # 1. Fetch Market Details for Snapshot
             market_details = await ig_client.fetch_market_details(epic)
@@ -138,7 +138,7 @@ async def run_market_strategy(
         logger.error(f"Invalid market key: {market_key}")
         return
 
-    async with AsyncIGClient() as ig_client:
+    async with AsyncIGClient.get_instance() as ig_client:
         # Initialize Stack
         collector = CollectorService(ig_client)
         market_data = MarketDataService(ig_client, collector)

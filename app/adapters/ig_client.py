@@ -30,10 +30,18 @@ class AsyncIGClient:
     Handles multiple sessions (Demo/Live) for trading and data fetching.
     """
 
+    _instance: Optional["AsyncIGClient"] = None
+
     BASE_URLS = {
         "DEMO": "https://demo-api.ig.com/gateway/deal",
         "LIVE": "https://api.ig.com/gateway/deal",
     }
+
+    @classmethod
+    def get_instance(cls) -> "AsyncIGClient":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     def __init__(self):
         self.sessions: Dict[str, httpx.AsyncClient] = {}
