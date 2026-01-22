@@ -47,10 +47,15 @@ class MarketRegime(BaseModel):
     session_low: Optional[float] = None
     gap_percent: float
 
+    # External Factors
+    vix_level: Optional[float] = None
+    client_sentiment: Optional[dict] = None  # e.g. {'long': 60, 'short': 40}
+
     # Extra Context Data (Dynamically attached)
     candles_5m: Optional[List[Any]] = None
     candles_1m: Optional[List[Any]] = None
     candles_daily: Optional[List[Any]] = None
+    trend_table: Optional[str] = None
 
     @property
     def is_high_volatility(self) -> bool:

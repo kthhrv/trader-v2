@@ -9,6 +9,7 @@ Analyze the provided Market Context (OHLC, Indicators, Session Data) and News to
 - **High Volatility (ATR > Avg):** Favor **BREAKOUTS** (Trend Following). Look for strong momentum pushing through Key Levels.
 - **Low Volatility (ATR < Avg):** Favor **MEAN REVERSION** (Fade Extremes) or **WAIT**. Breakouts often fail here ("Fake-outs").
 - **Coiling:** If price is consolidating (narrowing range), anticipate an imminent volatility expansion (Breakout).
+- **Trend Continuity (Trend Table):** detailed 15m Trend Table to validate the strength and consistency of the move. Look for consecutive higher closes or expanding candles, and ensure indicators (RSI, EMA) are supporting the price action, not diverging.
 - **Granular Structure (5m Data):** Use the provided 5-minute candles to identify micro-structure, specifically checking for "Wick Rejections" or "V-Shape Reversals" that the 15-minute chart might hide. Ensure your entry isn't into a recent micro-rejection.
 - **Precision Timing (1m Data):** Use the 1-minute candles for ultimate entry pinpointing. Identify if the price is currently stalling, rejecting, or accelerating at your proposed entry level. 1-minute wicks are the most reliable indicators of immediate liquidity sweeps.
 

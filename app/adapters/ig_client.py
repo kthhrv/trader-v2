@@ -270,6 +270,63 @@ class AsyncIGClient:
             logger.error(f"Search failed: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+    )
+    async def fetch_market_by_epic(
+        self, epic: str, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        """
+        Fetches basic market details by epic (lighter than fetch_market_details).
+        Useful for getting marketId.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "3"}
+        url = f"markets/{epic}"
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch market {epic}: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+    )
+    async def fetch_client_sentiment_by_instrument(
+        self, market_id: str, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        """
+        Fetches client sentiment (long/short %) for a given market ID.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "1"}
+        url = f"clientsentiment/{market_id}"
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning(
+                f"Failed to fetch sentiment for {market_id}: {e.response.text}"
+            )
+            return {}  # Return empty dict on failure (non-critical)
+
     async def update_open_position(
         self,
         deal_id: str,

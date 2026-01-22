@@ -136,3 +136,42 @@ class MarketDataService:
             "1D": 86400,
         }
         return mapping.get(resolution, 60)
+
+    async def get_vix_level(self, vix_epic: str = "CC.D.VIX.USS.IP") -> Optional[float]:
+        """
+        Fetches the current VIX level (Market Fear Index).
+        """
+        try:
+            data = await self.ig_client.fetch_market_by_epic(vix_epic)
+            if data and "snapshot" in data:
+                bid = data["snapshot"].get("bid")
+                if bid is not None:
+                    return float(bid)
+        except Exception as e:
+            logger.warning(f"Failed to fetch VIX: {e}")
+        return None
+
+    async def get_client_sentiment(self, epic: str) -> Optional[dict]:
+        """
+        Fetches client sentiment (Long/Short %) for the given epic.
+        """
+        try:
+            # 1. Get Market ID
+            market_details = await self.ig_client.fetch_market_by_epic(epic)
+            if not market_details or "instrument" not in market_details:
+                return None
+
+            market_id = market_details["instrument"]["marketId"]
+
+            # 2. Get Sentiment
+            sentiment = await self.ig_client.fetch_client_sentiment_by_instrument(
+                market_id
+            )
+            if sentiment:
+                return {
+                    "long": float(sentiment.get("longPositionPercentage", 0)),
+                    "short": float(sentiment.get("shortPositionPercentage", 0)),
+                }
+        except Exception as e:
+            logger.warning(f"Failed to fetch sentiment for {epic}: {e}")
+        return None
