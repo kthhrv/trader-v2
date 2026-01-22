@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import argparse
-from app.core.logger import logger
+from app.core.logger import logger, configure_logging
 from app.database.session import init_db
 from app.core.markets import MARKET_CONFIGS
 from app.cli.trade import run_market_strategy
@@ -54,6 +54,12 @@ async def main():
     parser.add_argument(
         "--yes", action="store_true", help="Skip confirmation prompt for execution"
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose logging (INFO level)",
+    )
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -62,12 +68,17 @@ async def main():
 
     args = parser.parse_args()
 
+    # 0. Configure Logging
+    configure_logging(args.verbose)
+
     # 1. Init DB (Auto-heal)
     if not args.debug_search:
         await init_db()
 
     # 2. Dispatch Commands
     if args.scheduler:
+        # Scheduler usually needs logs, so maybe force verbose if logic demands,
+        # but user can control it.
         await run_scheduler(args.dry_run)
         return
 
