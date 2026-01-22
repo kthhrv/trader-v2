@@ -1,10 +1,12 @@
 import asyncio
 import sys
 import argparse
+from sqlmodel import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.core.logger import logger
-from app.database.session import init_db
+from app.database.session import init_db, async_session_maker
+from app.database.models import TradeLog
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService
 from app.adapters.news_client import NewsClient
@@ -36,6 +38,55 @@ async def run_market_strategy(market_key: str, dry_run: bool):
         await engine.run_strategy(market_key)
 
 
+async def run_post_mortem(deal_id: str):
+    """
+    Runs a post-mortem analysis for a specific deal ID.
+    """
+    logger.info(f"Starting Post-Mortem for Deal ID: {deal_id}")
+
+    trade = None
+    async with async_session_maker() as session:
+        statement = select(TradeLog).where(TradeLog.deal_id == deal_id)
+        results = await session.execute(statement)
+        trade = results.scalars().first()
+
+    if not trade:
+        logger.error(f"Trade not found for Deal ID: {deal_id}")
+        return
+
+    logger.info(
+        f"Found Trade: {trade.symbol} ({trade.direction}) - Outcome: {trade.pnl}"
+    )
+
+    analyst = GeminiService()
+
+    # Construct context objects
+    trade_log_dict = trade.model_dump(mode="json")
+    execution_data_dict = {
+        "pnl": trade.pnl,
+        "entry_price": trade.price,
+        # In a real scenario, we'd fetch exit price from IG or a separate Execution table
+        "notes": trade.notes,
+    }
+
+    report = await analyst.generate_post_mortem(trade_log_dict, execution_data_dict)
+
+    if report:
+        print("\n" + "=" * 60)
+        print("POST-MORTEM ANALYSIS REPORT")
+        print("=" * 60)
+        print(f"Followed Plan: {report.did_follow_plan}")
+        print(f"Stop Loss Check: {report.stop_loss_critique}")
+        print(f"Slippage Impact: {report.slippage_impact}")
+        print(f"Reasoning Check: {report.reasoning_quality}")
+        print(f"Verdict: {report.verdict}")
+        print("-" * 60)
+        print(f"KEY LESSON: {report.key_lesson}")
+        print("=" * 60 + "\n")
+    else:
+        logger.error("Failed to generate post-mortem report.")
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Trader V2")
     parser.add_argument(
@@ -47,6 +98,9 @@ async def main():
     parser.add_argument("--dry-run", action="store_true", help="Simulate trades")
     parser.add_argument(
         "--analyst", action="store_true", help="Generate trading plan without executing"
+    )
+    parser.add_argument(
+        "--post-mortem", type=str, help="Run post-mortem analysis on a deal ID"
     )
     parser.add_argument(
         "--init-db", action="store_true", help="Initialize database tables"
@@ -69,7 +123,7 @@ async def main():
         logger.info("Initializing Database...")
         await init_db()
         logger.info("Database initialized.")
-        if not args.market and not args.scheduler:
+        if not args.market and not args.scheduler and not args.post_mortem:
             return
 
     # 2. Scheduler Mode
@@ -108,9 +162,14 @@ async def main():
             pass
         return
 
-    # 3. Single Market Run
+    # 3. Post Mortem
+    if args.post_mortem:
+        await run_post_mortem(args.post_mortem)
+        return
+
+    # 4. Single Market Run
     if not args.market:
-        logger.error("Please specify --market or --scheduler")
+        logger.error("Please specify --market, --scheduler, or --post-mortem")
         sys.exit(1)
 
     async with AsyncIGClient() as ig_client:

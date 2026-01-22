@@ -30,6 +30,7 @@ class TradeLog(SQLModel, table=True):
 
     # Metadata
     strategy_name: str
+    deal_id: Optional[str] = Field(default=None, index=True)
     signal_id: Optional[str] = None  # Link to Gemini analysis
     notes: Optional[str] = None
 
