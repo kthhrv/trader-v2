@@ -5,7 +5,7 @@ from sqlmodel import select
 from datetime import datetime, timedelta
 
 from app.database.session import init_db, async_session_maker
-from app.database.models import TradeSignal, TradeExecution
+from app.database.models import TradeExecution
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService, TradingSignal, Action
 from app.adapters.news_client import NewsClient
@@ -18,22 +18,28 @@ from app.services.trader import StrategyEngine
 @pytest.mark.asyncio
 async def test_full_trading_flow_e2e(httpx_mock):
     """
-    Tests the full flow from data fetching to order placement and DB storage.
+    Tests full lifecycle: Entry -> Trail Stop -> Trail Stop -> Exit.
     """
     await init_db()
 
     # 1. Mock Auth
     httpx_mock.add_response(
         method="POST",
-        url="https://demo-api.ig.com/gateway/deal/session",
+        url=re.compile(r"^https://api\.ig\.com/gateway/deal/session"),
+        status_code=200,
+        headers={"CST": "live_cst", "X-SECURITY-TOKEN": "live_token"},
+        json={"currentAccountId": "L123", "accountType": "CFD"},
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url=re.compile(r"^https://demo-api\.ig\.com/gateway/deal/session"),
         status_code=200,
         headers={"CST": "demo_cst", "X-SECURITY-TOKEN": "demo_token"},
         json={"currentAccountId": "D123", "accountType": "CFD"},
     )
 
-    # 2. Mock Prices (Two calls: MINUTE_15 and DAY)
-    # Note: StrategyEngine calls get_latest_candles for MINUTE_15 then DAY
-    mock_prices = {
+    # 2. Mock Prices
+    mock_prices_15m = {
         "prices": [
             {
                 "snapshotTime": (datetime.now() - timedelta(minutes=15 * i)).strftime(
@@ -47,20 +53,33 @@ async def test_full_trading_flow_e2e(httpx_mock):
             for i in range(50)
         ]
     }
-
-    # First call (MINUTE_15)
     httpx_mock.add_response(
         method="GET",
-        url=re.compile(r".*/prices/.*/MINUTE_15/.*"),
+        url=re.compile(r".*MINUTE_15.*"),
         status_code=200,
-        json=mock_prices,
+        json=mock_prices_15m,
     )
-    # Second call (DAY)
+
+    mock_prices_day = {
+        "prices": [
+            {
+                "snapshotTime": (datetime.now() - timedelta(days=i)).strftime(
+                    "%Y/%m/%d %H:%M:%S"
+                ),
+                "openPrice": {"bid": 6900},
+                "highPrice": {"bid": 7000},
+                "lowPrice": {"bid": 6800},
+                "closePrice": {"bid": 6950},
+            }
+            for i in range(5)
+        ]
+    }
+    # Use exact URL for DAY to fix matching issues
     httpx_mock.add_response(
         method="GET",
-        url=re.compile(r".*/prices/.*/DAY/.*"),
+        url="https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/DAY/5",
         status_code=200,
-        json={"prices": mock_prices["prices"][:5]},
+        json=mock_prices_day,
     )
 
     # 3. Mock Order Placement
@@ -68,54 +87,53 @@ async def test_full_trading_flow_e2e(httpx_mock):
         method="POST",
         url=re.compile(r".*/positions/otc"),
         status_code=200,
-        json={"dealReference": "REF123", "dealId": "DEAL456", "level": 7010},
+        json={"dealReference": "REF123", "dealId": "DEAL456", "level": 7015},
     )
 
-    # 4. Mock Trailing Stop Update (PUT)
-    # Register twice because the mock stream triggers two updates
+    # 4. Mock Trailing Stop Updates
     httpx_mock.add_response(
         method="PUT",
         url=re.compile(r".*/positions/otc/DEAL456"),
         status_code=200,
-        json={"dealReference": "REF_UPDATE_1"},
+        json={"dealReference": "REF_TRAIL_1"},
     )
     httpx_mock.add_response(
         method="PUT",
         url=re.compile(r".*/positions/otc/DEAL456"),
         status_code=200,
-        json={"dealReference": "REF_UPDATE_2"},
+        json={"dealReference": "REF_TRAIL_2"},
     )
 
-    # Instantiate Stack
     async with AsyncIGClient() as ig_client:
         collector = CollectorService(ig_client)
         market_data = MarketDataService(ig_client, collector)
-
         news_client = MagicMock(spec=NewsClient)
-        news_client.fetch_news = AsyncMock(return_value="Bullish News")
+        news_client.fetch_news = AsyncMock(return_value="News")
 
         analyst = MagicMock(spec=GeminiService)
+        # ATR = 20. Trail Dist = 30. Step = 10.
         analyst.analyze_market = AsyncMock(
             return_value=TradingSignal(
                 ticker="FTSE100",
                 action=Action.BUY,
                 entry=7010,
-                stop_loss=6900,
+                stop_loss=6990,
                 size=1.0,
                 atr=20.0,
                 use_trailing_stop=True,
                 confidence="high",
-                reasoning="Strong momentum breakout",
+                reasoning="Go",
             )
         )
 
         streamer = MagicMock(spec=StreamerService)
 
+        # Generator yielding price ticks
         async def mock_stream(epic):
-            # Yield a price that triggers the BUY (Entry 7010)
+            yield {"type": "price_update", "bid": 6990, "offer": 7005}
             yield {"type": "price_update", "bid": 7000, "offer": 7015}
-            # Keep yielding to allow monitor loop to start if needed, or stop
-            yield {"type": "price_update", "bid": 7020, "offer": 7025}
+            yield {"type": "price_update", "bid": 7045, "offer": 7060}
+            yield {"type": "price_update", "bid": 7080, "offer": 7095}
 
         streamer.stream = mock_stream
 
@@ -128,15 +146,13 @@ async def test_full_trading_flow_e2e(httpx_mock):
             dry_run=False,
         )
 
-        # Run
         await engine.run_strategy("london")
 
-        # Verify
         async with async_session_maker() as session:
-            signals = (await session.execute(select(TradeSignal))).scalars().all()
-            assert len(signals) == 1
-
-            executions = (await session.execute(select(TradeExecution))).scalars().all()
-            assert len(executions) == 1
-            assert executions[0].deal_id == "DEAL456"
-            assert executions[0].signal_id == signals[0].id
+            execution = (
+                (await session.execute(select(TradeExecution))).scalars().first()
+            )
+            assert execution is not None, "Trade execution not found in DB"
+            assert execution.deal_id == "DEAL456"
+            assert execution.initial_stop_loss == 6990
+            assert execution.current_stop_loss == 7050

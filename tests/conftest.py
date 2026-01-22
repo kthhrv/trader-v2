@@ -29,31 +29,32 @@ def mock_env_vars():
 
 
 @pytest.fixture(autouse=True)
-def mock_settings(monkeypatch):
+def mock_settings():
     """
-    Overrides the global settings object with test values.
+    Overrides the global settings object attributes with test values.
     """
-    from app.core.config import Settings
+    from app.core.config import settings
     from pydantic import SecretStr
 
-    # Create a Settings object using the mocked env vars (or explicit values)
-    # We use a distinct values to be sure
-    test_settings = Settings(
-        IG_DEMO_API_KEY=SecretStr("test_demo_key"),
-        IG_DEMO_USERNAME="test_demo_user",
-        IG_DEMO_PASSWORD=SecretStr("test_demo_pass"),
-        IG_DEMO_ACC_ID="test_demo_acc",
-        IG_LIVE_API_KEY=SecretStr("test_live_key"),
-        IG_LIVE_USERNAME="test_live_user",
-        IG_LIVE_PASSWORD=SecretStr("test_live_pass"),
-        IG_LIVE_ACC_ID="test_live_acc",
-        GEMINI_API_KEY=SecretStr("test_gemini_key"),
-        TRADING_ACCOUNT_ENV="DEMO",
-        DATA_ACCOUNT_ENV="LIVE",  # Force LIVE for data mocks in E2E tests usually
-    )
+    # Store original values to restore after test (optional but good practice)
+    # For now, just overwrite for tests
 
-    monkeypatch.setattr("app.core.config.settings", test_settings)
-    return test_settings
+    settings.IG_DEMO_API_KEY = SecretStr("test_demo_key")
+    settings.IG_DEMO_USERNAME = "test_demo_user"
+    settings.IG_DEMO_PASSWORD = SecretStr("test_demo_pass")
+    settings.IG_DEMO_ACC_ID = "test_demo_acc"
+
+    settings.IG_LIVE_API_KEY = SecretStr("test_live_key")
+    settings.IG_LIVE_USERNAME = "test_live_user"
+    settings.IG_LIVE_PASSWORD = SecretStr("test_live_pass")
+    settings.IG_LIVE_ACC_ID = "test_live_acc"
+
+    settings.GEMINI_API_KEY = SecretStr("test_gemini_key")
+
+    settings.TRADING_ACCOUNT_ENV = "DEMO"
+    settings.DATA_ACCOUNT_ENV = "LIVE"  # Force LIVE for tests to match mocks
+
+    return settings
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
