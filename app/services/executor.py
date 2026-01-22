@@ -112,10 +112,21 @@ class TradeExecutor:
         timeout = 7200
         start_time = datetime.now(timezone.utc).timestamp()
 
+        last_check_time = start_time
+
         async for update in self.streamer.stream(epic):
-            if (datetime.now(timezone.utc).timestamp() - start_time) > timeout:
+            now = datetime.now(timezone.utc).timestamp()
+            if (now - start_time) > timeout:
                 logger.info("Monitor timeout.")
                 break
+
+            # Periodic Liveness Check (every 60s)
+            if (now - last_check_time) > 60:
+                last_check_time = now
+                if not await self._is_position_open(deal_id):
+                    logger.info(f"Position {deal_id} closed. Stopping monitor.")
+                    await self._sync_outcome(deal_id)
+                    break
 
             if update.get("type") == "price_update":
                 bid = update.get("bid")
@@ -147,6 +158,47 @@ class TradeExecutor:
                         await self._update_execution_stop(deal_id, new_stop)
                     except Exception as e:
                         logger.error(f"Failed to update stop: {e}")
+
+    async def _is_position_open(self, deal_id: str) -> bool:
+        """Checks if the deal is still in the open positions list."""
+        try:
+            data = await self.ig_client.fetch_open_positions(
+                settings.TRADING_ACCOUNT_ENV
+            )
+            positions = data.get("positions", [])
+            for p in positions:
+                if p.get("position", {}).get("dealId") == deal_id:
+                    return True
+            return False
+        except Exception as e:
+            logger.warning(f"Failed to check open position status: {e}")
+            return True  # Assume open on error to keep monitoring
+
+    async def _sync_outcome(self, deal_id: str):
+        """Fetches final outcome from IG history and updates DB."""
+        try:
+            # We assume it closed recently
+            await self.ig_client.fetch_transaction_history(
+                max_span_seconds=3600 * 24,  # 24h
+                env_type=settings.TRADING_ACCOUNT_ENV,
+            )
+
+            # TODO: Parse 'transactions' to find exact PnL and Exit Price.
+            # For now, just mark CLOSED.
+
+            async with db_session.async_session_maker() as session:
+                stmt = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
+                result = await session.execute(stmt)
+                execution = result.scalars().first()
+                if execution:
+                    execution.outcome_status = "CLOSED"
+                    execution.exit_time = datetime.now(timezone.utc)
+                    session.add(execution)
+                    await session.commit()
+                    logger.info(f"Deal {deal_id} marked as CLOSED in DB.")
+
+        except Exception as e:
+            logger.error(f"Failed to sync outcome for {deal_id}: {e}")
 
     async def _save_execution(
         self, signal_id, deal_id, direction, fill_price, size, stop_loss

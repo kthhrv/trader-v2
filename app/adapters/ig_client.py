@@ -260,6 +260,44 @@ class AsyncIGClient:
             logger.error(f"Failed to update position {deal_id}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
+    async def fetch_open_positions(self, env_type: str = "LIVE") -> Dict[str, Any]:
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "2"}
+
+        try:
+            response = await client.get("/positions", headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch open positions: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
+    async def fetch_transaction_history(
+        self, max_span_seconds: int = 172800, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        # Using V2 endpoint if available, but history usually V1 or V2?
+        # Standard is /history/transactions
+        headers = {"VERSION": "2"}
+        url = f"/history/transactions/ALL_DEAL/{max_span_seconds}"
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch history: {e.response.text}")
+            # IG sometimes returns 404 or empty if no history?
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
     async def create_order(
         self,
         epic: str,
