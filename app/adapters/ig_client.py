@@ -202,6 +202,39 @@ class AsyncIGClient:
             logger.error(f"Failed to fetch prices range for {epic}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
+    async def update_open_position(
+        self,
+        deal_id: str,
+        stop_level: float,
+        limit_level: Optional[float] = None,
+        env_type: str = "LIVE",
+    ):
+        """
+        Updates the Stop/Limit levels of an open position.
+        """
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {
+            "VERSION": "2",
+            "_method": "PUT",
+        }  # Method override often required for PUT in IG
+
+        payload = {"stopLevel": stop_level, "limitLevel": limit_level}
+
+        try:
+            # Endpoint: /positions/otc/{dealId}
+            response = await client.put(
+                f"/positions/otc/{deal_id}", json=payload, headers=headers
+            )
+            response.raise_for_status()
+            logger.info(f"Updated position {deal_id}: Stop={stop_level}")
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to update position {deal_id}: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
     async def create_order(
         self,
         epic: str,

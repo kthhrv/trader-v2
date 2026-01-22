@@ -2,6 +2,7 @@ import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timezone
 from typing import Optional
+from sqlmodel import select
 
 from app.core.config import settings
 from app.core.logger import logger
@@ -239,8 +240,95 @@ class StrategyEngine:
                     stop_loss=signal.stop_loss,
                 )
 
+                if signal.use_trailing_stop:
+                    # Block execution to monitor trade
+                    await self._monitor_position(
+                        deal_id, epic, direction, signal.stop_loss, signal.atr
+                    )
+
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
+
+    async def _monitor_position(
+        self, deal_id: str, epic: str, direction: str, current_stop: float, atr: float
+    ):
+        """
+        Monitors an active position using the StreamerService and manages Trailing Stop.
+        """
+        logger.info(f"Starting Monitor for Deal {deal_id} (ATR: {atr})...")
+
+        # Risk Management Rules
+        trail_distance = atr * 1.5  # Keep stop 1.5 ATR away
+        step_size = atr * 0.5  # Only move if we can improve by 0.5 ATR
+
+        # Hard timeout (e.g., 2 hours)
+        timeout = 7200
+        start_time = datetime.now(timezone.utc).timestamp()
+
+        async for update in self.streamer.stream(epic):
+            if (datetime.now(timezone.utc).timestamp() - start_time) > timeout:
+                logger.info("Monitor timeout reached. Stopping stream.")
+                break
+
+            if update.get("type") == "price_update":
+                bid = update.get("bid")
+                offer = update.get("offer")
+
+                if not bid or not offer:
+                    continue
+
+                new_stop = None
+
+                # Logic for BUY
+                if direction == "BUY":
+                    # Current price for exit logic is Bid
+                    market_price = bid
+
+                    # Target Stop = Current Price - Trail Distance
+                    target_stop = market_price - trail_distance
+
+                    # If target stop is significantly higher than current stop, Move it up.
+                    if target_stop > (current_stop + step_size):
+                        new_stop = round(target_stop, 1)
+
+                # Logic for SELL
+                elif direction == "SELL":
+                    # Current price for exit is Offer
+                    market_price = offer
+
+                    # Target Stop = Current Price + Trail Distance
+                    target_stop = market_price + trail_distance
+
+                    # If target stop is significantly lower than current stop, Move it down.
+                    if target_stop < (current_stop - step_size):
+                        new_stop = round(target_stop, 1)
+
+                if new_stop:
+                    logger.info(
+                        f"Trailing Stop Trigger: Price {bid if direction == 'BUY' else offer} -> New Stop {new_stop}"
+                    )
+                    try:
+                        # Use settings.TRADING_ACCOUNT_ENV to determine correct account type
+                        await self.ig_client.update_open_position(
+                            deal_id,
+                            stop_level=new_stop,
+                            env_type=settings.TRADING_ACCOUNT_ENV,
+                        )
+                        current_stop = new_stop
+                        # Update DB
+                        await self._update_execution_stop(deal_id, new_stop)
+                    except Exception as e:
+                        logger.error(f"Failed to update stop: {e}")
+
+    async def _update_execution_stop(self, deal_id: str, new_stop: float):
+        async with async_session_maker() as session:
+            stmt = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
+            result = await session.execute(stmt)
+            execution = result.scalars().first()
+            if execution:
+                execution.current_stop_loss = new_stop
+                session.add(execution)
+                await session.commit()
 
     async def _save_signal(
         self, signal: TradingSignal, strategy_name: str
