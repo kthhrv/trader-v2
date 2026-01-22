@@ -6,17 +6,43 @@ from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
 from app.adapters.gemini_service import TradingSignal, Action
 
 
-@pytest.mark.asyncio
-async def test_strategy_engine_run():
-    # Mocks
+@pytest.fixture
+def mock_deps():
     mock_ig = MagicMock()
     mock_ig.create_order = AsyncMock(return_value={"dealId": "TEST_DEAL"})
 
     mock_data = MagicMock()
-    # Mock candle data or _build_market_regime directly
-    # Easier to mock _build_market_regime for high level test
-
     mock_analyst = MagicMock()
+    mock_news = MagicMock()
+    mock_news.fetch_news = AsyncMock(return_value="News")
+    mock_streamer = MagicMock()
+
+    return mock_ig, mock_data, mock_analyst, mock_news, mock_streamer
+
+
+@pytest.fixture
+def dummy_regime():
+    return MarketRegime(
+        symbol="FTSE100",
+        timestamp=datetime.now(timezone.utc),
+        current_price=7000,
+        daily_open=6900,
+        prev_close=6950,
+        atr_14=15,
+        avg_atr=15,
+        volatility_ratio=1.0,
+        regime=VolatilityRegime.MEDIUM,
+        ema_20=6980,
+        trend=TrendContext.BULLISH,
+        rsi_14=60,
+        gap_percent=0.5,
+    )
+
+
+@pytest.mark.asyncio
+async def test_strategy_engine_run_buy(mock_deps, dummy_regime):
+    mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
+
     mock_analyst.analyze_market = AsyncMock(
         return_value=TradingSignal(
             ticker="FTSE100",
@@ -27,41 +53,94 @@ async def test_strategy_engine_run():
             atr=10,
             use_trailing_stop=True,
             confidence="high",
-            reasoning="Test",
+            reasoning="Go",
         )
     )
-
-    mock_news = MagicMock()
-    mock_news.fetch_news = AsyncMock(return_value="Mock News Summary")
-
-    mock_streamer = MagicMock()
 
     engine = StrategyEngine(
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=False
     )
 
-    # Mock the internal method to skip data fetching logic in this unit test
-    engine._build_market_regime = AsyncMock(  # type: ignore
-        return_value=MarketRegime(
-            symbol="FTSE100",
-            timestamp=datetime.now(timezone.utc),
-            current_price=7000,
-            daily_open=6900,
-            prev_close=6950,
-            atr_14=15,
-            avg_atr=15,
-            volatility_ratio=1.0,
-            regime=VolatilityRegime.MEDIUM,
-            ema_20=6980,
-            trend=TrendContext.BULLISH,
-            rsi_14=60,
-            gap_percent=0.5,
+    # Mock data fetching
+    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+
+    await engine.run_strategy("london")
+
+    mock_ig.create_order.assert_called_once()
+    assert mock_ig.create_order.call_args.kwargs["direction"] == "BUY"
+
+
+@pytest.mark.asyncio
+async def test_strategy_engine_wait_action(mock_deps, dummy_regime):
+    mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
+
+    mock_analyst.analyze_market = AsyncMock(
+        return_value=TradingSignal(
+            ticker="FTSE100",
+            action=Action.WAIT,
+            entry=0,
+            stop_loss=0,
+            size=0,
+            atr=0,
+            use_trailing_stop=False,
+            confidence="low",
+            reasoning="Wait",
         )
     )
 
-    # Run
+    engine = StrategyEngine(
+        mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=False
+    )
+
+    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+
     await engine.run_strategy("london")
 
-    # Verify
-    mock_analyst.analyze_market.assert_called_once()
-    mock_ig.create_order.assert_called_once()
+    # Should NOT place order
+    mock_ig.create_order.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_strategy_engine_dry_run(mock_deps, dummy_regime):
+    mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
+
+    mock_analyst.analyze_market = AsyncMock(
+        return_value=TradingSignal(
+            ticker="FTSE100",
+            action=Action.SELL,
+            entry=7000,
+            stop_loss=7050,
+            size=1,
+            atr=10,
+            use_trailing_stop=True,
+            confidence="high",
+            reasoning="Sell",
+        )
+    )
+
+    # Dry Run = True
+    engine = StrategyEngine(
+        mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=True
+    )
+
+    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+
+    await engine.run_strategy("london")
+
+    # Should NOT call create_order despite SELL signal
+    mock_ig.create_order.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_strategy_engine_insufficient_data(mock_deps):
+    mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
+
+    engine = StrategyEngine(mock_ig, mock_data, mock_analyst, mock_news, mock_streamer)
+
+    # Simulate data failure
+    engine._build_market_regime = AsyncMock(return_value=None)  # type: ignore
+
+    await engine.run_strategy("london")
+
+    mock_analyst.analyze_market.assert_not_called()
+    mock_ig.create_order.assert_not_called()
