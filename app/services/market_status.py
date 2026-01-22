@@ -19,8 +19,8 @@ class MarketStatusService:
             self.us_holidays = holidays.UnitedStates()  # type: ignore
 
         self.jp_holidays = holidays.Japan()  # type: ignore
-        self.au_holidays = holidays.Australia(state="NSW")  # type: ignore
-        self.de_holidays = holidays.Germany(state="HE")  # type: ignore
+        self.au_holidays = holidays.Australia(subdiv="NSW")  # type: ignore
+        self.de_holidays = holidays.Germany(subdiv="HE")  # type: ignore
 
     def _get_country_code(self, epic: str) -> str:
         """

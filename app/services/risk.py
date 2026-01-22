@@ -17,6 +17,8 @@ class RiskManager:
 
         # Fetch Account Balance
         try:
+            # Note: ig_client.get_account_balance returns TOTAL balance (equity)
+            # This allows concurrent trades as margin doesn't reduce the risk base.
             balance = await self.ig_client.get_account_balance(
                 settings.TRADING_ACCOUNT_ENV
             )
@@ -33,7 +35,7 @@ class RiskManager:
             allowed_loss = balance - settings.MIN_ACCOUNT_BALANCE
             if allowed_loss <= 0:
                 logger.error(
-                    f"Balance ({balance}) is below Minimum Floor ({settings.MIN_ACCOUNT_BALANCE}). Trading halted."
+                    f"Total Balance ({balance}) is below Minimum Floor ({settings.MIN_ACCOUNT_BALANCE}). Trading halted."
                 )
                 return False
             # Cap max risk by the distance to the floor
@@ -43,7 +45,8 @@ class RiskManager:
                 )
                 max_risk_amount = allowed_loss
 
-        # Trade Risk = Size * Distance        # Distance = |Entry - Stop|
+        # Trade Risk = Size * Distance
+        # Distance = |Entry - Stop|
         distance = abs(signal.entry - signal.stop_loss)
         if distance == 0:
             logger.error("Invalid Stop Loss: Distance is 0")
@@ -56,17 +59,9 @@ class RiskManager:
         )
 
         if trade_risk > max_risk_amount:
-            logger.warning(
-                f"Risk Violation: Trade Risk ({trade_risk:.2f}) > Max Risk ({max_risk_amount:.2f})"
+            logger.error(
+                f"Risk Violation: Trade Risk ({trade_risk:.2f}) > Max Risk ({max_risk_amount:.2f}). Rejecting trade."
             )
-
-            # Auto-adjust size?
-            new_size = round(max_risk_amount / distance, 2)
-            if new_size < 0.5:  # Assuming min bet 0.5?
-                logger.error(f"Calculated size {new_size} below minimum. rejecting.")
-                return False
-
-            logger.info(f"Adjusting Size: {signal.size} -> {new_size}")
-            signal.size = new_size  # Mutate signal
+            return False
 
         return True

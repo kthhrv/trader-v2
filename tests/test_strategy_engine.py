@@ -44,7 +44,7 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
     await engine.run_strategy("london")
 
     mock_analyzer.analyze_market.assert_called_once()
-    mock_risk.validate_signal.assert_called_once()
+    mock_risk.validate_signal.assert_called_once_with(mock_signal)
     mock_executor.execute_trade.assert_called_once()
     assert mock_executor.execute_trade.call_args[0][0] == mock_signal
 
@@ -107,5 +107,5 @@ async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
 
     await engine.run_strategy("london")
 
-    mock_risk.validate_signal.assert_called_once()
+    mock_risk.validate_signal.assert_called_once_with(mock_signal)
     mock_executor.execute_trade.assert_not_called()
