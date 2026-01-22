@@ -8,6 +8,7 @@ from app.core.logger import logger
 from app.core.markets import MARKET_CONFIGS
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService, TradingSignal, Action
+from app.adapters.news_client import NewsClient
 from app.services.market_data import MarketDataService
 from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
 
@@ -18,11 +19,13 @@ class StrategyEngine:
         ig_client: AsyncIGClient,
         market_data: MarketDataService,
         analyst: GeminiService,
+        news_client: NewsClient,
         dry_run: bool = False,
     ):
         self.ig_client = ig_client
         self.market_data = market_data
         self.analyst = analyst
+        self.news_client = news_client
         self.dry_run = dry_run
 
     async def run_strategy(self, market_key: str):
@@ -43,9 +46,10 @@ class StrategyEngine:
             logger.error("Failed to build market regime. Aborting.")
             return
 
-        # 2. Fetch News (Placeholder for now, or use simple mock)
-        # TODO: Port NewsFetcher or use a simplified version
-        news_summary = "No news fetcher configured yet."
+        # 2. Fetch News
+        news_query = self._get_news_query(epic)
+        logger.info(f"Fetching news for query: {news_query}")
+        news_summary = await self.news_client.fetch_news(news_query, market=market_key)
 
         # 3. Format Context for AI
         context_str = self._format_context(regime, news_summary)
@@ -64,6 +68,26 @@ class StrategyEngine:
 
         # 5. Execute (if not WAIT)
         await self._execute_signal(signal, epic)
+
+    def _get_news_query(self, epic: str) -> str:
+        if "FTSE" in epic:
+            return "FTSE 100 UK Economy"
+        elif "SPX" in epic or "US500" in epic or "SPTRD" in epic:
+            return "S&P 500 US Economy"
+        elif "GBP" in epic:
+            return "GBP USD Forex"
+        elif "EUR" in epic:
+            return "EUR USD Forex"
+        elif "DAX" in epic or "DE30" in epic:
+            return "DAX 40 Germany Economy"
+        elif "NIKKEI" in epic:
+            return "Nikkei 225 Japan Economy"
+        elif "ASX" in epic:
+            return "ASX 200 Australia Economy"
+        elif "NASDAQ" in epic:
+            return "Nasdaq 100 US Tech Sector"
+        else:
+            return "Global Financial Markets"
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
         """

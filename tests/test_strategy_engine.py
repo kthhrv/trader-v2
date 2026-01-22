@@ -31,7 +31,10 @@ async def test_strategy_engine_run():
         )
     )
 
-    engine = StrategyEngine(mock_ig, mock_data, mock_analyst, dry_run=False)
+    mock_news = MagicMock()
+    mock_news.fetch_news = AsyncMock(return_value="Mock News Summary")
+
+    engine = StrategyEngine(mock_ig, mock_data, mock_analyst, mock_news, dry_run=False)
 
     # Mock the internal method to skip data fetching logic in this unit test
     engine._build_market_regime = AsyncMock(  # type: ignore

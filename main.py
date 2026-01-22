@@ -7,6 +7,7 @@ from app.core.logger import logger
 from app.database.session import init_db
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService
+from app.adapters.news_client import NewsClient
 from app.services.collector import CollectorService
 from app.services.market_data import MarketDataService
 from app.services.trader import StrategyEngine
@@ -20,11 +21,13 @@ async def run_market_strategy(market_key: str, dry_run: bool):
         collector = CollectorService(ig_client)
         market_data = MarketDataService(ig_client, collector)
         analyst = GeminiService()
+        news_client = NewsClient()
 
         engine = StrategyEngine(
             ig_client=ig_client,
             market_data=market_data,
             analyst=analyst,
+            news_client=news_client,
             dry_run=dry_run,
         )
         await engine.run_strategy(market_key)
@@ -108,11 +111,13 @@ async def main():
         collector = CollectorService(ig_client)
         market_data = MarketDataService(ig_client, collector)
         analyst = GeminiService()
+        news_client = NewsClient()
 
         engine = StrategyEngine(
             ig_client=ig_client,
             market_data=market_data,
             analyst=analyst,
+            news_client=news_client,
             dry_run=args.dry_run,
         )
 
