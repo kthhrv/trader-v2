@@ -181,3 +181,120 @@
   "confidence": "high",
   "reasoning": "Go"
 }
+2026-01-22 00:56:31 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:56:31 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:31 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:31 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:56:31 | ERROR    | app.adapters.ig_client:authenticate:138 - IG Auth Error (LIVE): No response can be found for POST request on https://api.ig.com/gateway/deal/session amongst:
+- Match POST request on https://demo-api.ig.com/gateway/deal/session
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/MIN_15/50
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/D/5
+- Match POST request on https://demo-api.ig.com/gateway/deal/positions/otc
+2026-01-22 00:56:31 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (MIN_15): No response can be found for POST request on https://api.ig.com/gateway/deal/session amongst:
+- Match POST request on https://demo-api.ig.com/gateway/deal/session
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/MIN_15/50
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/D/5
+- Match POST request on https://demo-api.ig.com/gateway/deal/positions/otc
+2026-01-22 00:56:31 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:31 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:31 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:56:31 | ERROR    | app.adapters.ig_client:authenticate:138 - IG Auth Error (LIVE): No response can be found for POST request on https://api.ig.com/gateway/deal/session amongst:
+- Match POST request on https://demo-api.ig.com/gateway/deal/session
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/MIN_15/50
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/D/5
+- Match POST request on https://demo-api.ig.com/gateway/deal/positions/otc
+2026-01-22 00:56:31 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (D): No response can be found for POST request on https://api.ig.com/gateway/deal/session amongst:
+- Match POST request on https://demo-api.ig.com/gateway/deal/session
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/MIN_15/50
+- Match GET request on https://api.ig.com/gateway/deal/prices/IX.D.FTSE.DAILY.IP/D/5
+- Match POST request on https://demo-api.ig.com/gateway/deal/positions/otc
+2026-01-22 00:56:31 | WARNING  | app.services.trader:_build_market_regime:117 - Insufficient 15m data for analysis.
+2026-01-22 00:56:31 | ERROR    | app.services.trader:run_strategy:53 - Failed to build market regime. Aborting.
+2026-01-22 00:56:40 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:56:40 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:40 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:40 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:56:40 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated LIVE. Account: L123
+2026-01-22 00:56:40 | INFO     | app.services.collector:_process_and_save:101 - Saved 50 MIN_15 bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:56:40 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:40 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:40 | INFO     | app.services.collector:_process_and_save:101 - Saved 5 D bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:56:40 | WARNING  | app.services.trader:_build_market_regime:117 - Insufficient 15m data for analysis.
+2026-01-22 00:56:40 | ERROR    | app.services.trader:run_strategy:53 - Failed to build market regime. Aborting.
+2026-01-22 00:56:55 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:56:55 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:55 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:55 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:56:55 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated LIVE. Account: L123
+2026-01-22 00:56:55 | INFO     | app.services.collector:_process_and_save:101 - Saved 50 MIN_15 bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:56:55 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:56:55 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:56 | INFO     | app.services.collector:_process_and_save:101 - Saved 5 D bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:56:56 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:56:56 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.BUY | Conf: high
+2026-01-22 00:56:56 | INFO     | app.services.trader:_execute_signal:202 - Executing Action.BUY for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:56:56 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 00:56:56 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: D123
+2026-01-22 00:56:56 | INFO     | app.services.trader:_execute_signal:223 - Order Placed: {'dealReference': 'REF123', 'dealId': 'DEAL456', 'level': 7010}
+2026-01-22 00:56:56 | INFO     | app.services.trader:_save_execution:288 - Execution saved for Deal DEAL456
+2026-01-22 00:57:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 1 MIN bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 00:57:00 | INFO     | app.services.collector:_process_and_save:101 - Saved 1 MIN bars for IX.D.NASDAQ.CASH.IP
+2026-01-22 00:57:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 1 MIN bars for EPIC1...
+2026-01-22 00:57:00 | INFO     | app.services.collector:_process_and_save:101 - Saved 1 MIN bars for EPIC1
+2026-01-22 00:57:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 1 MIN bars for EPIC1...
+2026-01-22 00:57:00 | INFO     | app.services.collector:_process_and_save:101 - Saved 1 MIN bars for EPIC1
+2026-01-22 00:57:00 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:00 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:57:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated LIVE. Account: L123
+2026-01-22 00:57:00 | INFO     | app.services.collector:_process_and_save:101 - Saved 50 MIN_15 bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:57:00 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 00:57:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:57:00 | INFO     | app.services.collector:_process_and_save:101 - Saved 5 D bars for IX.D.FTSE.DAILY.IP
+2026-01-22 00:57:00 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:57:00 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.BUY | Conf: high
+2026-01-22 00:57:00 | INFO     | app.services.trader:_execute_signal:202 - Executing Action.BUY for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: D123
+2026-01-22 00:57:00 | INFO     | app.services.trader:_execute_signal:223 - Order Placed: {'dealReference': 'REF123', 'dealId': 'DEAL456', 'level': 7010}
+2026-01-22 00:57:00 | INFO     | app.services.trader:_save_execution:288 - Execution saved for Deal DEAL456
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: D12345
+2026-01-22 00:57:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 00:57:00 | ERROR    | app.adapters.ig_client:authenticate:133 - IG Auth Failed (DEMO): {"errorCode":"error.security.client-token-invalid"}
+2026-01-22 00:57:01 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 00:57:01 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated LIVE. Account: L12345
+2026-01-22 00:57:01 | INFO     | app.services.market_data:get_latest_candles:100 - Delta fetch triggered for STALE.EPIC (Updating from 2026-01-21 22:57:01.150770+00:00)
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.BUY | Conf: high
+2026-01-22 00:57:01 | INFO     | app.services.trader:_execute_signal:202 - Executing Action.BUY for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:57:01 | INFO     | app.services.trader:_execute_signal:223 - Order Placed: {'dealId': 'TEST_DEAL'}
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.WAIT | Conf: low
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.SELL | Conf: high
+2026-01-22 00:57:01 | INFO     | app.services.trader:_execute_signal:202 - Executing Action.SELL for IX.D.FTSE.DAILY.IP...
+2026-01-22 00:57:01 | INFO     | app.services.trader:_execute_signal:205 - DRY RUN: Trade simulation successful.
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:01 | ERROR    | app.services.trader:run_strategy:53 - Failed to build market regime. Aborting.
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:48 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:58 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:71 - AI Decision: Action.BUY | Conf: high
+2026-01-22 00:57:01 | INFO     | app.services.trader:run_strategy:77 - ANALYST REPORT:
+{
+  "ticker": "FTSE100",
+  "action": "BUY",
+  "entry": 7000.0,
+  "entry_type": "INSTANT",
+  "stop_loss": 6950.0,
+  "take_profit": null,
+  "size": 1.0,
+  "atr": 10.0,
+  "use_trailing_stop": true,
+  "confidence": "high",
+  "reasoning": "Go"
+}
