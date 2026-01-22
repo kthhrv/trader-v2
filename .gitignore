@@ -1,10 +1,58 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
-*.egg-info
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Virtual environments
+# Virtual Environment
 .venv
+venv/
+ENV/
+env/
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+data/trader.db
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json # Optional: Some prefer to commit this, usually yes for apps.
