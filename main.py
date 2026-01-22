@@ -116,6 +116,16 @@ async def main():
         "--news", action="store_true", help="Fetch and print news for the market"
     )
     parser.add_argument(
+        "--news-check",
+        action="store_true",
+        help="Run a health check on news fetching for all markets.",
+    )
+    parser.add_argument(
+        "--with-rating",
+        action="store_true",
+        help="When using --news-check, ask Gemini to rate the relevance/quality of the news.",
+    )
+    parser.add_argument(
         "--post-mortem", type=str, help="Run post-mortem analysis on a deal ID"
     )
     parser.add_argument(
@@ -138,18 +148,9 @@ async def main():
 
     args = parser.parse_args()
 
-    # 1. Init DB
-    if args.init_db:
-        logger.info("Initializing Database...")
+    # 1. Init DB (Auto-heal)
+    if not args.debug_search:
         await init_db()
-        logger.info("Database initialized.")
-        if (
-            not args.market
-            and not args.scheduler
-            and not args.post_mortem
-            and not args.news
-        ):
-            return
 
     # 2. Scheduler Mode
     if args.scheduler:
@@ -236,7 +237,85 @@ async def main():
         print(summary)
         return
 
-    # 6. Single Market Run (Interactive)
+    # 6. News Check
+    if args.news_check:
+        logger.info("Running News Health Check...")
+        fetcher = NewsClient()
+        analyst = GeminiService() if args.with_rating else None
+
+        print(f"\n{'=' * 80}")
+        print(f"{'NEWS HEALTH CHECK':^80}")
+        if args.with_rating:
+            print(f"{'(with AI Quality Audit)':^80}")
+        print(f"{'=' * 80}")
+
+        passed = 0
+        failed = 0
+
+        def get_query(epic):
+            if "FTSE" in epic:
+                return "FTSE 100 UK Economy"
+            elif "SPX" in epic or "US500" in epic or "SPTRD" in epic:
+                return "S&P 500 US Economy"
+            elif "GBP" in epic:
+                return "GBP USD Forex"
+            elif "EUR" in epic:
+                return "EUR USD Forex"
+            elif "DAX" in epic or "DE30" in epic:
+                return "DAX 40 Germany Economy"
+            elif "NIKKEI" in epic:
+                return "Nikkei 225 Japan Economy"
+            elif "ASX" in epic:
+                return "ASX 200 Australia Economy"
+            elif "NASDAQ" in epic:
+                return "Nasdaq 100 US Tech Sector"
+            return "Global Financial Markets"
+
+        targets = MARKET_CONFIGS.items()
+        if args.market:
+            if args.market in MARKET_CONFIGS:
+                targets = [(args.market, MARKET_CONFIGS[args.market])]
+            else:
+                logger.error(f"Unknown market: {args.market}")
+                return
+
+        for market, config in targets:
+            query = get_query(config["epic"])
+            print(f"\nChecking [{market.upper()}] Query: '{query}'...")
+            try:
+                result = await fetcher.fetch_news(query, market=market)
+
+                if "No recent news found" in result:
+                    print("  [WARN] No news returned.")
+                    failed += 1
+                else:
+                    lines = result.split("\n")
+                    count = len([line for line in lines if line.strip()])
+                    print(f"  [PASS] Retrieved content (~{count} lines).")
+                    print(f"  Sample: {result[:70]}...")
+
+                    if analyst:
+                        print("  Running AI Audit...", end="", flush=True)
+                        quality = await analyst.assess_news(result, market)
+                        if quality:
+                            print(
+                                f"\r  [AI RATING] Score: {quality.score}/10 | Clarity: {quality.sentiment_clarity}"
+                            )
+                            print(f"  Reasoning: {quality.reasoning}")
+                            if quality.score < 5:
+                                print("  [WARN] Low quality news detected.")
+                        else:
+                            print("\r  [AI ERROR] Could not rate news.")
+
+                    passed += 1
+            except Exception as e:
+                print(f"  [FAIL] Exception: {e}")
+                failed += 1
+
+        print(f"\nSummary: {passed} Passed, {failed} Failed.")
+        return
+
+    # 7. Single Market Run (Interactive)
     if not args.market:
         logger.error("Please specify --market, --scheduler, or --post-mortem")
         sys.exit(1)
