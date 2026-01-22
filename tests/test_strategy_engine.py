@@ -40,7 +40,7 @@ def dummy_regime():
 
 
 @pytest.mark.asyncio
-async def test_strategy_engine_run_buy(mock_deps, dummy_regime):
+async def test_strategy_engine_run_buy(mock_deps, dummy_regime, monkeypatch):
     mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
 
     mock_analyst.analyze_market = AsyncMock(
@@ -61,8 +61,9 @@ async def test_strategy_engine_run_buy(mock_deps, dummy_regime):
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=False
     )
 
-    # Mock data fetching
-    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+    # Mock data fetching using monkeypatch
+    mock_build = AsyncMock(return_value=dummy_regime)
+    monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 
     await engine.run_strategy("london")
 
@@ -71,7 +72,7 @@ async def test_strategy_engine_run_buy(mock_deps, dummy_regime):
 
 
 @pytest.mark.asyncio
-async def test_strategy_engine_wait_action(mock_deps, dummy_regime):
+async def test_strategy_engine_wait_action(mock_deps, dummy_regime, monkeypatch):
     mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
 
     mock_analyst.analyze_market = AsyncMock(
@@ -92,7 +93,8 @@ async def test_strategy_engine_wait_action(mock_deps, dummy_regime):
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=False
     )
 
-    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+    mock_build = AsyncMock(return_value=dummy_regime)
+    monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 
     await engine.run_strategy("london")
 
@@ -101,7 +103,7 @@ async def test_strategy_engine_wait_action(mock_deps, dummy_regime):
 
 
 @pytest.mark.asyncio
-async def test_strategy_engine_dry_run(mock_deps, dummy_regime):
+async def test_strategy_engine_dry_run(mock_deps, dummy_regime, monkeypatch):
     mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
 
     mock_analyst.analyze_market = AsyncMock(
@@ -123,7 +125,8 @@ async def test_strategy_engine_dry_run(mock_deps, dummy_regime):
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=True
     )
 
-    engine._build_market_regime = AsyncMock(return_value=dummy_regime)  # type: ignore
+    mock_build = AsyncMock(return_value=dummy_regime)
+    monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 
     await engine.run_strategy("london")
 
@@ -132,13 +135,14 @@ async def test_strategy_engine_dry_run(mock_deps, dummy_regime):
 
 
 @pytest.mark.asyncio
-async def test_strategy_engine_insufficient_data(mock_deps):
+async def test_strategy_engine_insufficient_data(mock_deps, monkeypatch):
     mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
 
     engine = StrategyEngine(mock_ig, mock_data, mock_analyst, mock_news, mock_streamer)
 
     # Simulate data failure
-    engine._build_market_regime = AsyncMock(return_value=None)  # type: ignore
+    mock_build = AsyncMock(return_value=None)
+    monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 
     await engine.run_strategy("london")
 
