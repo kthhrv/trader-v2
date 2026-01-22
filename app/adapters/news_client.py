@@ -82,6 +82,7 @@ class NewsClient:
 
             # Aggregate Text
             if google_res:
+                news_summary += "\nSource: Google News\n"
                 for item in google_res:
                     if count >= limit:
                         break
@@ -175,13 +176,8 @@ class NewsClient:
         results = []
         try:
             url = self.yahoo_base_url.format(symbol=symbol)
-            response = await client.get(url)
-
-            # Yahoo sometimes returns 404 for symbols with no news, check status safely
-            if response.status_code != 200:
-                return []
-
-            feed = await asyncio.to_thread(feedparser.parse, response.content)
+            # Use feedparser directly (in thread) as it handles Yahoo's quirks better than raw httpx
+            feed = await asyncio.to_thread(feedparser.parse, url)
 
             if feed.entries:
                 entries = sorted(
