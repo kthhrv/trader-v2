@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Optional
+from typing import Optional, Type, TypeVar
 
 from google import genai
 from google.genai import types, errors
@@ -14,6 +14,13 @@ from tenacity import (
 
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.prompts import (
+    STRATEGY_ANALYST_INSTRUCTION,
+    NEWS_ANALYST_INSTRUCTION,
+    POST_MORTEM_INSTRUCTION,
+)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class Action(str, Enum):
@@ -48,6 +55,15 @@ class TradingSignal(BaseModel):
     reasoning: str
 
 
+class PostMortemReport(BaseModel):
+    did_follow_plan: bool
+    stop_loss_critique: str
+    slippage_impact: str
+    reasoning_quality: str
+    key_lesson: str
+    verdict: str
+
+
 class GeminiService:
     """
     Async service for Gemini AI analysis.
@@ -56,57 +72,33 @@ class GeminiService:
 
     def __init__(self, model_name: str = "gemini-2.0-flash-thinking-exp-01-21"):
         self.model_name = model_name
-        # Note: genai.Client can be used for async if we use its async methods
-        # However, the SDK also supports a global async client approach or individual calls.
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY.get_secret_value())
-
-        self.system_instruction = """
-            You are a Senior Momentum Trader specializing in "Open Drive" breakout strategies for global indices.
-            Your objective is to identify high-probability breakout setups during the market open (first 90 mins).
-
-            ### 1. Market Analysis Protocol
-            Analyze provided Market Context and News to determine Market Regime:
-            - **High Volatility (ATR > Avg):** Favor BREAKOUTS.
-            - **Low Volatility (ATR < Avg):** Favor MEAN REVERSION or WAIT.
-            
-            ### 2. Trading Rules (Strict)
-            - **Extension Rule:** Do NOT enter if entry > 1.5x ATR from EMA20.
-            - **Stop Loss:** MUST be at least 1.5x ATR away from entry.
-            - **High Volatility Stop:** Increase to 2.0x ATR.
-            - **Trailing Stop:** use_trailing_stop=True for Trend Days, False for Range Days.
-        """
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception_type((errors.ServerError, errors.APIError)),
     )
-    async def analyze_market(
-        self, market_context: str, strategy_name: str = "Market Open"
-    ) -> Optional[TradingSignal]:
+    async def _generate_structured(
+        self, prompt: str, system_instruction: str, response_model: Type[T]
+    ) -> Optional[T]:
         """
-        Analyzes market data and returns a structured TradingSignal.
+        Generic helper for structured generation.
         """
-        prompt = f"""Analyze the following {strategy_name} market data and generate a trading signal:
-
-{market_context}"""
-
         try:
-            # The google-genai SDK 0.8+ supports async calls via .aio
             response = await self.client.aio.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=self.system_instruction,
+                    system_instruction=system_instruction,
                     response_mime_type="application/json",
-                    response_schema=TradingSignal,
+                    response_schema=response_model,
                     thinking_config=types.ThinkingConfig(
                         include_thoughts=True,
                     ),
                 ),
             )
 
-            # Log thoughts if present
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
                     if part.thought:
@@ -117,13 +109,27 @@ class GeminiService:
                 return None
 
             data = json.loads(response.text)
-            return TradingSignal(**data)
+            return response_model(**data)
 
         except Exception as e:
-            logger.error(f"Gemini Analysis Error: {e}")
+            logger.error(f"Gemini API Error: {e}")
             if isinstance(e, (errors.ServerError, errors.APIError)):
-                raise e  # Trigger retry
+                raise e
             return None
+
+    async def analyze_market(
+        self, market_context: str, strategy_name: str = "Market Open"
+    ) -> Optional[TradingSignal]:
+        """
+        Analyzes market data and returns a structured TradingSignal.
+        """
+        prompt = f"""Analyze the following {strategy_name} market data and generate a trading signal:
+
+{market_context}"""
+
+        return await self._generate_structured(
+            prompt, STRATEGY_ANALYST_INSTRUCTION, TradingSignal
+        )
 
     async def assess_news(
         self, news_text: str, market_name: str
@@ -135,21 +141,24 @@ class GeminiService:
 
 {news_text}"""
 
-        try:
-            response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=NewsQuality,
-                    thinking_config=types.ThinkingConfig(include_thoughts=True),
-                ),
-            )
+        return await self._generate_structured(
+            prompt, NEWS_ANALYST_INSTRUCTION, NewsQuality
+        )
 
-            if not response.text:
-                return None
+    async def generate_post_mortem(
+        self, trade_log: dict, execution_data: dict
+    ) -> Optional[PostMortemReport]:
+        """
+        Generates a post-mortem analysis for a completed trade.
+        """
+        prompt = f"""Conduct a post-mortem analysis for the following trade:
 
-            return NewsQuality(**json.loads(response.text))
-        except Exception as e:
-            logger.error(f"Gemini News Assessment Error: {e}")
-            return None
+Trade Log:
+{json.dumps(trade_log, indent=2)}
+
+Execution Data:
+{json.dumps(execution_data, indent=2)}
+"""
+        return await self._generate_structured(
+            prompt, POST_MORTEM_INSTRUCTION, PostMortemReport
+        )

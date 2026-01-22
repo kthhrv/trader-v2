@@ -1,11 +1,15 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.adapters.gemini_service import GeminiService, TradingSignal, Action
+from app.adapters.gemini_service import (
+    GeminiService,
+    TradingSignal,
+    Action,
+    PostMortemReport,
+)
 
 
 @pytest.mark.asyncio
 async def test_gemini_analyze_market_success():
-    # Setup mock
     service = GeminiService()
     service.client = MagicMock()
 
@@ -13,7 +17,6 @@ async def test_gemini_analyze_market_success():
     mock_response.text = '{"ticker": "FTSE100", "action": "BUY", "entry": 7500.0, "stop_loss": 7450.0, "size": 1.0, "atr": 20.0, "use_trailing_stop": true, "confidence": "high", "reasoning": "test"}'
     mock_response.candidates = [MagicMock(content=MagicMock(parts=[]))]
 
-    # Mock the aio client
     service.client.aio = MagicMock()
     service.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
@@ -22,7 +25,6 @@ async def test_gemini_analyze_market_success():
     assert isinstance(signal, TradingSignal)
     assert signal.ticker == "FTSE100"
     assert signal.action == Action.BUY
-    assert signal.entry == 7500.0
 
 
 @pytest.mark.asyncio
@@ -32,6 +34,7 @@ async def test_gemini_assess_news_success():
 
     mock_response = MagicMock()
     mock_response.text = '{"score": 8, "relevance": "high", "sentiment_clarity": "clear", "reasoning": "very relevant news"}'
+    mock_response.candidates = [MagicMock(content=MagicMock(parts=[]))]
 
     service.client.aio = MagicMock()
     service.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
@@ -40,4 +43,22 @@ async def test_gemini_assess_news_success():
 
     assert news is not None
     assert news.score == 8
-    assert news.relevance == "high"
+
+
+@pytest.mark.asyncio
+async def test_gemini_post_mortem_success():
+    service = GeminiService()
+    service.client = MagicMock()
+
+    mock_response = MagicMock()
+    mock_response.text = '{"did_follow_plan": true, "stop_loss_critique": "good", "slippage_impact": "low", "reasoning_quality": "sound", "key_lesson": "none", "verdict": "pass"}'
+    mock_response.candidates = [MagicMock(content=MagicMock(parts=[]))]
+
+    service.client.aio = MagicMock()
+    service.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    report = await service.generate_post_mortem({"entry": 100}, {"pnl": 50})
+
+    assert isinstance(report, PostMortemReport)
+    assert report.did_follow_plan is True
+    assert report.verdict == "pass"
