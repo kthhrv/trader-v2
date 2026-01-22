@@ -10,7 +10,7 @@ async def test_ig_client_authentication_success(httpx_mock):
         url="https://demo-api.ig.com/gateway/deal/session",
         status_code=200,
         headers={"CST": "fake_cst", "X-SECURITY-TOKEN": "fake_x_security_token"},
-        json={"accountId": "D12345", "accountType": "SPREADBET"},
+        json={"currentAccountId": "D12345", "accountType": "SPREADBET"},
     )
 
     client = AsyncIGClient()
@@ -53,7 +53,7 @@ async def test_fetch_prices_calls_correct_env(httpx_mock):
         url="https://api.ig.com/gateway/deal/session",
         status_code=200,
         headers={"CST": "live_cst", "X-SECURITY-TOKEN": "live_token"},
-        json={"accountId": "L12345", "accountType": "SPREADBET"},
+        json={"currentAccountId": "L12345", "accountType": "SPREADBET"},
     )
 
     # 2. Mock Prices call
