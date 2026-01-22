@@ -23,7 +23,7 @@ class NewsClient:
 
         # Locale Configurations for Native News
         self.locale_config = {
-            "germany": {
+            "dax": {
                 "base_url": "https://news.google.com/rss/search?q={query}&hl=de&gl=DE&ceid=DE:de",
                 "native_query": "DAX 40 Wirtschaft",
             },

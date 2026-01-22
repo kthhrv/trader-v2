@@ -41,13 +41,13 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
     mock_save = AsyncMock(return_value=mock_db_signal)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
-    await engine.run_strategy("london")
+    await engine.run_strategy("ftse")
 
     mock_analyzer.analyze_market.assert_called_once()
     mock_risk.validate_signal.assert_called_once_with(mock_signal)
     mock_executor.execute_trade.assert_called_once()
     assert mock_executor.execute_trade.call_args[0][0] == mock_signal
-    assert mock_executor.execute_trade.call_args[0][3] == 2.0  # max_spread for london
+    assert mock_executor.execute_trade.call_args[0][3] == 2.0  # max_spread for ftse
 
 
 @pytest.mark.asyncio
@@ -72,7 +72,7 @@ async def test_strategy_engine_wait_action(mock_deps, monkeypatch):
     engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
-    await engine.run_strategy("london")
+    await engine.run_strategy("ftse")
 
     mock_executor.execute_trade.assert_not_called()
 
@@ -106,7 +106,7 @@ async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
     engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
-    await engine.run_strategy("london")
+    await engine.run_strategy("ftse")
 
     mock_risk.validate_signal.assert_called_once_with(mock_signal)
     mock_executor.execute_trade.assert_not_called()

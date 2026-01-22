@@ -40,7 +40,7 @@ async def test_strategy_engine_analyst_mode(mock_deps, monkeypatch):
     )
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
-    await engine.run_strategy("london")
+    await engine.run_strategy("ftse")
 
     # Should analyze
     mock_analyzer.analyze_market.assert_called_once()

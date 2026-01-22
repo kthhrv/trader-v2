@@ -291,8 +291,16 @@ async def fetch_news_print(market_key: str):
     query = "Global Financial Markets"
     if "FTSE" in epic:
         query = "FTSE 100 UK Economy"
-    elif "SPX" in epic:
+    elif "SPX" in epic or "US500" in epic or "SPTRD" in epic:
         query = "S&P 500 US Economy"
+    elif "DAX" in epic or "DE30" in epic:
+        query = "DAX 40 Germany Economy"
+    elif "NIKKEI" in epic:
+        query = "Nikkei 225 Japan Economy"
+    elif "ASX" in epic:
+        query = "ASX 200 Australia Economy"
+    elif "NASDAQ" in epic:
+        query = "Nasdaq 100 US Tech Sector"
 
     print(f"Fetching news for {market_key}...")
     summary = await news_client.fetch_news(query, market=market_key)

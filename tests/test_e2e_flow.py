@@ -104,7 +104,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         yield {"type": "price_update", "bid": 6995, "offer": 7020}
 
         # 2. Valid Tick (Should EXECUTE)
-        # Entry at 7015 (offer), Bid 7013 (Spread 2.0 <= London max 2.0)
+        # Entry at 7015 (offer), Bid 7013 (Spread 2.0 <= FTSE max 2.0)
         yield {"type": "price_update", "bid": 7013, "offer": 7015}
 
         # Risk is 7015 - 6990 = 25 points. 1.5R = 37.5 points.
@@ -156,7 +156,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         mock_datetime.now.return_value.tzinfo = timezone.utc  # Keep tz info
 
         # Run Strategy
-        await engine.run_strategy("london")
+        await engine.run_strategy("ftse")
 
     # 4. Verification
     async with db_session.async_session_maker() as session:

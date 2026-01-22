@@ -20,7 +20,7 @@ async def test_holiday_block(mock_deps):
     """
     Test that run_strategy aborts early if is_holiday returns True.
     """
-    market_key = "london"
+    market_key = "ftse"
     epic = MARKET_CONFIGS[market_key]["epic"]
 
     # Setup Mock
@@ -45,7 +45,7 @@ async def test_no_holiday_proceeds(mock_deps):
     """
     Test that run_strategy proceeds if is_holiday returns False.
     """
-    market_key = "london"
+    market_key = "ftse"
 
     # Setup Mock
     mock_deps["market_status"].is_holiday.return_value = False
