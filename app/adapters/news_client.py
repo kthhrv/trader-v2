@@ -47,11 +47,41 @@ class NewsClient:
         source = source.lower() if source else None
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # 1. Google News
-            if source is None or source == "google":
-                google_res = await self._fetch_google(
-                    client, query, market, cutoff_time
+            fetch_tasks = []
+            do_google = source is None or source == "google"
+            do_yahoo = source is None or source == "yahoo"
+
+            if do_google:
+                fetch_tasks.append(
+                    self._fetch_google(client, query, market, cutoff_time)
                 )
+
+            if do_yahoo:
+                yahoo_symbol = self._get_yahoo_symbol(query)
+                if yahoo_symbol:
+                    fetch_tasks.append(
+                        self._fetch_yahoo(client, yahoo_symbol, cutoff_time)
+                    )
+
+            results = await asyncio.gather(*fetch_tasks)
+
+            # Map back to specific processors
+            google_res = []
+            yahoo_res = []
+
+            res_idx = 0
+            if do_google:
+                if res_idx < len(results):
+                    google_res = results[res_idx]
+                    res_idx += 1
+
+            if do_yahoo:
+                yahoo_symbol = self._get_yahoo_symbol(query)
+                if yahoo_symbol and res_idx < len(results):
+                    yahoo_res = results[res_idx]
+
+            # Aggregate Text
+            if google_res:
                 for item in google_res:
                     if count >= limit:
                         break
@@ -60,22 +90,19 @@ class NewsClient:
                         seen_titles.add(item["title"])
                         count += 1
 
-            # 2. Yahoo News
-            if source is None or source == "yahoo":
-                yahoo_symbol = self._get_yahoo_symbol(query)
+            if yahoo_res:
+                yahoo_symbol = self._get_yahoo_symbol(query)  # Re-get symbol for header
                 if yahoo_symbol:
-                    yahoo_res = await self._fetch_yahoo(
-                        client, yahoo_symbol, cutoff_time
-                    )
-                    if yahoo_res:
-                        news_summary += f"\nSource: Yahoo Finance ({yahoo_symbol})\n"
-                        for item in yahoo_res:
-                            if count >= limit * 2:
-                                break
-                            if item["title"] not in seen_titles:
-                                news_summary += f"{count + 1}. [{item['published']}] {item['title']}\n"
-                                seen_titles.add(item["title"])
-                                count += 1
+                    news_summary += f"\nSource: Yahoo Finance ({yahoo_symbol})\n"
+                    for item in yahoo_res:
+                        if count >= limit * 2:
+                            break
+                        if item["title"] not in seen_titles:
+                            news_summary += (
+                                f"{count + 1}. [{item['published']}] {item['title']}\n"
+                            )
+                            seen_titles.add(item["title"])
+                            count += 1
 
         if count == 0:
             return "No recent news found (within last 24h)."
