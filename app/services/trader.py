@@ -9,6 +9,7 @@ from app.core.markets import MARKET_CONFIGS
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService, TradingSignal, Action
 from app.adapters.news_client import NewsClient
+from app.services.streamer import StreamerService
 from app.services.market_data import MarketDataService
 from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
 
@@ -20,12 +21,14 @@ class StrategyEngine:
         market_data: MarketDataService,
         analyst: GeminiService,
         news_client: NewsClient,
+        streamer: StreamerService,
         dry_run: bool = False,
     ):
         self.ig_client = ig_client
         self.market_data = market_data
         self.analyst = analyst
         self.news_client = news_client
+        self.streamer = streamer
         self.dry_run = dry_run
 
     async def run_strategy(self, market_key: str):

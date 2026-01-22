@@ -10,6 +10,7 @@ from app.adapters.gemini_service import GeminiService
 from app.adapters.news_client import NewsClient
 from app.services.collector import CollectorService
 from app.services.market_data import MarketDataService
+from app.services.streamer import StreamerService
 from app.services.trader import StrategyEngine
 from app.core.markets import MARKET_CONFIGS
 
@@ -22,12 +23,14 @@ async def run_market_strategy(market_key: str, dry_run: bool):
         market_data = MarketDataService(ig_client, collector)
         analyst = GeminiService()
         news_client = NewsClient()
+        streamer = StreamerService(ig_client)
 
         engine = StrategyEngine(
             ig_client=ig_client,
             market_data=market_data,
             analyst=analyst,
             news_client=news_client,
+            streamer=streamer,
             dry_run=dry_run,
         )
         await engine.run_strategy(market_key)
@@ -112,12 +115,14 @@ async def main():
         market_data = MarketDataService(ig_client, collector)
         analyst = GeminiService()
         news_client = NewsClient()
+        streamer = StreamerService(ig_client)
 
         engine = StrategyEngine(
             ig_client=ig_client,
             market_data=market_data,
             analyst=analyst,
             news_client=news_client,
+            streamer=streamer,
             dry_run=args.dry_run,
         )
 
