@@ -11,6 +11,8 @@ from app.adapters.gemini_service import GeminiService, TradingSignal, Action
 from app.adapters.news_client import NewsClient
 from app.services.streamer import StreamerService
 from app.services.market_data import MarketDataService
+from app.database.session import async_session_maker
+from app.database.models import TradeSignal, TradeExecution
 from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
 
 
@@ -68,6 +70,9 @@ class StrategyEngine:
 
         logger.info(f"AI Decision: {signal.action} | Conf: {signal.confidence}")
 
+        # Save Signal to DB
+        signal_db = await self._save_signal(signal, config["name"])
+
         if self.analyst_mode:
             logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
             return
@@ -76,7 +81,7 @@ class StrategyEngine:
             return
 
         # 5. Execute (if not WAIT)
-        await self._execute_signal(signal, epic)
+        await self._execute_signal(signal, epic, signal_db.id)
 
     def _get_news_query(self, epic: str) -> str:
         if "FTSE" in epic:
@@ -188,7 +193,9 @@ class StrategyEngine:
         {news}
         """
 
-    async def _execute_signal(self, signal: TradingSignal, epic: str):
+    async def _execute_signal(
+        self, signal: TradingSignal, epic: str, signal_id: Optional[int]
+    ):
         """
         Executes the trade via IG Client.
         """
@@ -215,5 +222,67 @@ class StrategyEngine:
             )
             logger.info(f"Order Placed: {response}")
 
+            if "dealReference" in response:
+                deal_ref = response["dealReference"]
+                # In a real scenario, we'd wait for deal confirmation to get the Deal ID
+                # For now, we assume immediate success or use ref if dealId missing (IG API specific)
+                deal_id = response.get("dealId", deal_ref)
+
+                await self._save_execution(
+                    signal_id=signal_id,
+                    deal_id=deal_id,
+                    direction=direction,
+                    fill_price=response.get(
+                        "level", signal.entry
+                    ),  # Use requested entry if level missing
+                    size=signal.size,
+                    stop_loss=signal.stop_loss,
+                )
+
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
+
+    async def _save_signal(
+        self, signal: TradingSignal, strategy_name: str
+    ) -> TradeSignal:
+        async with async_session_maker() as session:
+            db_signal = TradeSignal(
+                symbol=signal.ticker,
+                strategy_name=strategy_name,
+                signal_decision=signal.action.value,
+                confidence=signal.confidence,
+                reasoning=signal.reasoning,
+                entry_price=signal.entry,
+                stop_loss=signal.stop_loss,
+                take_profit=signal.take_profit,
+                position_size=signal.size,
+                atr_at_generation=signal.atr,
+            )
+            session.add(db_signal)
+            await session.commit()
+            await session.refresh(db_signal)
+            return db_signal
+
+    async def _save_execution(
+        self,
+        signal_id: Optional[int],
+        deal_id: str,
+        direction: str,
+        fill_price: float,
+        size: float,
+        stop_loss: float,
+    ):
+        async with async_session_maker() as session:
+            execution = TradeExecution(
+                signal_id=signal_id,
+                deal_id=deal_id,
+                direction=direction,
+                fill_price=fill_price,
+                size=size,
+                initial_stop_loss=stop_loss,
+                current_stop_loss=stop_loss,
+                outcome_status="OPEN",
+            )
+            session.add(execution)
+            await session.commit()
+            logger.info(f"Execution saved for Deal {deal_id}")

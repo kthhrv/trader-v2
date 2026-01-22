@@ -1,38 +1,94 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
 
 
-class TradeLog(SQLModel, table=True):
+class TradeSignal(SQLModel, table=True):
     """
-    Records the lifecycle of a trade execution.
+    The AI-generated trading plan.
     """
 
-    __tablename__ = "trade_logs"
+    __tablename__ = "trade_signals"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # Trade Details
+    # Context
     symbol: str = Field(index=True)
-    direction: str  # BUY or SELL
-    action: str  # OPEN, CLOSE, MODIFY
+    strategy_name: str
 
-    # Price Data
-    price: float
-    size: float
-    stop_loss: Optional[float] = None
+    # Analysis
+    signal_decision: str  # BUY, SELL, WAIT
+    confidence: str
+    reasoning: str
+
+    # Plan Parameters
+    entry_price: float
+    stop_loss: float
     take_profit: Optional[float] = None
+    position_size: float
+
+    # Risk Context
+    atr_at_generation: float
+
+    # Relationship
+    execution: Optional["TradeExecution"] = Relationship(back_populates="signal")
+
+
+class TradeExecution(SQLModel, table=True):
+    """
+    The actual broker execution details.
+    """
+
+    __tablename__ = "trade_executions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    signal_id: Optional[int] = Field(default=None, foreign_key="trade_signals.id")
+
+    # Broker Info
+    deal_id: str = Field(index=True)
+    direction: str  # BUY / SELL
+
+    # Execution Details
+    fill_price: float
+    fill_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    size: float
+
+    # Management
+    initial_stop_loss: float
+    current_stop_loss: float  # Updated by trailing stop
 
     # Outcome
+    exit_price: Optional[float] = None
+    exit_time: Optional[datetime] = None
     pnl: Optional[float] = None
-    fees: Optional[float] = None
+    outcome_status: str = "OPEN"  # OPEN, WIN, LOSS, BREAKEVEN
 
-    # Metadata
-    strategy_name: str
-    deal_id: Optional[str] = Field(default=None, index=True)
-    signal_id: Optional[str] = None  # Link to Gemini analysis
-    notes: Optional[str] = None
+    # Relationships
+    signal: Optional[TradeSignal] = Relationship(back_populates="execution")
+    post_mortem: Optional["TradePostMortem"] = Relationship(back_populates="execution")
+
+
+class TradePostMortem(SQLModel, table=True):
+    """
+    After-action review of a closed trade.
+    """
+
+    __tablename__ = "trade_post_mortems"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    execution_id: int = Field(foreign_key="trade_executions.id")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    did_follow_plan: bool
+    stop_loss_critique: str
+    slippage_impact: str
+    reasoning_quality: str
+    key_lesson: str
+    verdict: str
+
+    # Relationship
+    execution: Optional[TradeExecution] = Relationship(back_populates="post_mortem")
 
 
 class HistoricalCandle(SQLModel, table=True):

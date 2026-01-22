@@ -1,7 +1,7 @@
 import pytest
 from app.core.config import settings
 from app.database.session import init_db, get_session
-from app.database.models import TradeLog
+from app.database.models import TradeSignal
 
 
 @pytest.mark.asyncio
@@ -18,23 +18,26 @@ async def test_database_initialization():
 
     # 2. Create a session and write a record
     async for session in get_session():
-        trade = TradeLog(
+        signal = TradeSignal(
             symbol="EURUSD",
-            direction="BUY",
-            action="OPEN",
-            price=1.0500,
-            size=1.0,
-            strategy_name="TEST_STRAT",
+            strategy_name="TEST",
+            signal_decision="BUY",
+            confidence="high",
+            reasoning="test",
+            entry_price=1.0,
+            stop_loss=0.9,
+            position_size=1.0,
+            atr_at_generation=0.01,
         )
-        session.add(trade)
+        session.add(signal)
         await session.commit()
-        await session.refresh(trade)
+        await session.refresh(signal)
 
-        assert trade.id is not None
-        trade_id = trade.id
+        assert signal.id is not None
+        signal_id = signal.id
 
     # 3. Read it back
     async for session in get_session():
-        trade = await session.get(TradeLog, trade_id)
-        assert trade is not None
-        assert trade.symbol == "EURUSD"
+        read_signal = await session.get(TradeSignal, signal_id)
+        assert read_signal is not None
+        assert read_signal.symbol == "EURUSD"

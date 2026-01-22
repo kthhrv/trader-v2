@@ -6,7 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.core.logger import logger
 from app.database.session import init_db, async_session_maker
-from app.database.models import TradeLog
+from app.database.models import TradeExecution
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService
 from app.adapters.news_client import NewsClient
@@ -44,30 +44,37 @@ async def run_post_mortem(deal_id: str):
     """
     logger.info(f"Starting Post-Mortem for Deal ID: {deal_id}")
 
-    trade = None
+    execution = None
     async with async_session_maker() as session:
-        statement = select(TradeLog).where(TradeLog.deal_id == deal_id)
+        statement = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
         results = await session.execute(statement)
-        trade = results.scalars().first()
+        execution = results.scalars().first()
 
-    if not trade:
-        logger.error(f"Trade not found for Deal ID: {deal_id}")
+        # Eager load the signal if available.
+        # Note: In pure async + lazy loading, this might need explict join or refresh
+        if execution:
+            await session.refresh(execution, ["signal"])
+
+    if not execution:
+        logger.error(f"Execution not found for Deal ID: {deal_id}")
         return
 
     logger.info(
-        f"Found Trade: {trade.symbol} ({trade.direction}) - Outcome: {trade.pnl}"
+        f"Found Trade: {execution.deal_id} ({execution.direction}) - Outcome: {execution.pnl}"
     )
 
     analyst = GeminiService()
 
-    # Construct context objects
-    trade_log_dict = trade.model_dump(mode="json")
-    execution_data_dict = {
-        "pnl": trade.pnl,
-        "entry_price": trade.price,
-        # In a real scenario, we'd fetch exit price from IG or a separate Execution table
-        "notes": trade.notes,
+    # Map to context
+    trade_log_dict = {
+        "deal_id": execution.deal_id,
+        "entry": execution.fill_price,
+        "action": execution.direction,
+        "pnl": execution.pnl,
+        "reasoning": execution.signal.reasoning if execution.signal else "N/A",
     }
+
+    execution_data_dict = execution.model_dump(mode="json")
 
     report = await analyst.generate_post_mortem(trade_log_dict, execution_data_dict)
 
