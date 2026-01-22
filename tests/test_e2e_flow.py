@@ -99,9 +99,21 @@ async def test_full_trading_flow_e2e_mocked_adapter():
 
     # Generator yielding price ticks
     async def mock_stream(epic):
-        yield {"type": "price_update", "bid": 7000, "offer": 7015}
-        yield {"type": "price_update", "bid": 7045, "offer": 7060}
+        # Entry at 7015 (offer)
+        yield {"type": "price_update", "bid": 7010, "offer": 7015}
+
+        # Risk is 7015 - 6990 = 25 points. 1.5R = 37.5 points.
+        # Need price >= 7015 + 37.5 = 7052.5 to trigger breakeven.
+
+        # Move price up to trigger breakeven
+        yield {"type": "price_update", "bid": 7060, "offer": 7075}
+
+        # Now at Breakeven (Stop = 7015). Trail distance is 3 * ATR = 3 * 20 = 60.
+        # Market Price 7060 - 60 = 7000. Not better than 7015.
+
+        # Move price higher to trigger trailing stop
         yield {"type": "price_update", "bid": 7080, "offer": 7095}
+        # Market Price 7080 - 60 = 7020. Better than 7015.
 
     streamer.stream = mock_stream
 
@@ -126,7 +138,8 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         assert execution is not None, "Trade execution not found in DB"
         assert execution.deal_id == "DEAL456"
         assert execution.initial_stop_loss == 6990
-        assert execution.current_stop_loss == 7050
+        # Should have moved to BE (7015) then trailed to 7020
+        assert execution.current_stop_loss == 7020
 
     assert mock_ig.create_order.called
     assert mock_ig.update_open_position.call_count == 2

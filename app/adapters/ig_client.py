@@ -197,6 +197,35 @@ class AsyncIGClient:
             logger.error(f"Failed to fetch prices range for {epic}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+    )
+    async def fetch_market_details(
+        self, epic: str, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        """
+        Fetches full market details including snapshot (Bid/Offer).
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        url = f"markets/{epic}"
+        headers = {"VERSION": "3"}
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"Failed to fetch market details for {epic}: {e.response.text}"
+            )
+            raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
+
     async def get_account_balance(self, env_type: str = "DEMO") -> float:
         env_type = self._normalize_env(env_type)
         if env_type not in self.auth_tokens:
@@ -290,10 +319,12 @@ class AsyncIGClient:
             await self.authenticate(env_type)
 
         client = await self._get_session(env_type)
-        # Using V2 endpoint if available, but history usually V1 or V2?
-        # Standard is /history/transactions
-        headers = {"VERSION": "2"}
-        url = f"/history/transactions/ALL_DEAL/{max_span_seconds}"
+        # API expects milliseconds
+        period_millis = max_span_seconds * 1000
+
+        # Using V1 endpoint (V2 often problematic for history?)
+        headers = {"VERSION": "1"}
+        url = f"/history/transactions/ALL_DEAL/{period_millis}"
 
         try:
             response = await client.get(url, headers=headers)
@@ -301,7 +332,30 @@ class AsyncIGClient:
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch history: {e.response.text}")
-            # IG sometimes returns 404 or empty if no history?
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
+    async def fetch_deal_confirmation(
+        self, deal_reference: str, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        """
+        Fetches the confirmation for a deal reference to get the actual Deal ID.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "1"}
+        url = f"/confirms/{deal_reference}"
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"Failed to fetch confirmation for {deal_reference}: {e.response.text}"
+            )
             raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def create_order(

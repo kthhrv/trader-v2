@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import asyncio
 from typing import Optional
 from sqlmodel import select
 
@@ -56,25 +57,49 @@ class TradeExecutor:
             )
             logger.info(f"Order Placed: {response}")
 
+            deal_id = response.get("dealId")
             if "dealReference" in response:
                 deal_ref = response["dealReference"]
-                deal_id = response.get("dealId", deal_ref)
 
-                # Save Execution
-                await self._save_execution(
-                    signal_id=signal_id,
-                    deal_id=deal_id,
-                    direction=direction,
-                    fill_price=response.get("level", triggered_price),
-                    size=signal.size,
-                    stop_loss=signal.stop_loss,
+                # Wait for confirmation to get the real Deal ID
+                logger.info(f"Waiting for confirmation of {deal_ref}...")
+                for _ in range(10):  # Retry a few times
+                    await asyncio.sleep(0.5)
+                    try:
+                        confirm = await self.ig_client.fetch_deal_confirmation(
+                            deal_ref, env_type=settings.TRADING_ACCOUNT_ENV
+                        )
+                        if confirm.get("dealStatus") == "ACCEPTED":
+                            deal_id = confirm.get("dealId")
+                            logger.info(f"Order ACCEPTED. Deal ID: {deal_id}")
+                            break
+                        elif confirm.get("dealStatus") == "REJECTED":
+                            logger.error(f"Order REJECTED: {confirm.get('reason')}")
+                            return
+                    except Exception:
+                        pass
+
+            if not deal_id:
+                logger.error("Could not obtain Deal ID. Trade execution incomplete.")
+                return
+
+            # Save Execution
+            await self._save_execution(
+                signal_id=signal_id,
+                deal_id=deal_id,
+                direction=direction,
+                fill_price=response.get("level", triggered_price),
+                size=signal.size,
+                stop_loss=signal.stop_loss,
+            )
+
+            # Monitor
+            if signal.use_trailing_stop:
+                # Need entry price for Breakeven calculation
+                fill_price = float(response.get("level", triggered_price))
+                await self._monitor_position(
+                    deal_id, epic, direction, fill_price, signal.stop_loss, signal.atr
                 )
-
-                # Monitor
-                if signal.use_trailing_stop:
-                    await self._monitor_position(
-                        deal_id, epic, direction, signal.stop_loss, signal.atr
-                    )
 
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
@@ -104,14 +129,31 @@ class TradeExecutor:
         return None
 
     async def _monitor_position(
-        self, deal_id: str, epic: str, direction: str, current_stop: float, atr: float
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        current_stop: float,
+        atr: float,
     ):
-        logger.info(f"Starting Monitor for Deal {deal_id} (ATR: {atr})...")
-        trail_distance = atr * 1.5
-        step_size = atr * 0.5
+        logger.info(
+            f"Starting Monitor for Deal {deal_id} (Entry: {entry_price}, Stop: {current_stop}, ATR: {atr})..."
+        )
+
+        # Logic State
+        moved_to_breakeven = False
+        risk_distance = abs(entry_price - current_stop)
+
+        # Configuration
+        breakeven_trigger_r = settings.BREAKEVEN_TRIGGER_R
+
+        # Trailing Parameters (Loose trail after BE)
+        trail_distance = atr * 3.0
+        step_size = atr * 0.1  # Min step to avoid spamming
+
         timeout = 7200
         start_time = datetime.now(timezone.utc).timestamp()
-
         last_check_time = start_time
 
         async for update in self.streamer.stream(epic):
@@ -134,30 +176,61 @@ class TradeExecutor:
                 if not bid or not offer:
                     continue
 
-                new_stop = None
-                if direction == "BUY":
-                    market_price = bid
-                    target_stop = market_price - trail_distance
-                    if target_stop > (current_stop + step_size):
-                        new_stop = round(target_stop, 1)
-                elif direction == "SELL":
-                    market_price = offer
-                    target_stop = market_price + trail_distance
-                    if target_stop < (current_stop - step_size):
-                        new_stop = round(target_stop, 1)
+                current_price = bid if direction == "BUY" else offer
 
-                if new_stop:
-                    logger.info(f"Trailing Stop Trigger: {new_stop}")
-                    try:
-                        await self.ig_client.update_open_position(
-                            deal_id,
-                            stop_level=new_stop,
-                            env_type=settings.TRADING_ACCOUNT_ENV,
-                        )
-                        current_stop = new_stop
-                        await self._update_execution_stop(deal_id, new_stop)
-                    except Exception as e:
-                        logger.error(f"Failed to update stop: {e}")
+                # Rule 1: Check for Breakeven Trigger
+                if not moved_to_breakeven and risk_distance > 0:
+                    profit_dist = (
+                        (current_price - entry_price)
+                        if direction == "BUY"
+                        else (entry_price - current_price)
+                    )
+
+                    if profit_dist >= (breakeven_trigger_r * risk_distance):
+                        new_stop = entry_price
+
+                        # Verify it's actually an improvement
+                        is_better = (
+                            direction == "BUY" and new_stop > current_stop
+                        ) or (direction == "SELL" and new_stop < current_stop)
+
+                        if is_better:
+                            logger.info(
+                                f"Moving Stop to BREAKEVEN for {deal_id} at {new_stop} (Trigger: {breakeven_trigger_r}R)"
+                            )
+                            if await self._update_stop_loss(deal_id, new_stop):
+                                current_stop = new_stop
+                                moved_to_breakeven = True
+
+                # Rule 2: Dynamic Trailing (Only AFTER Breakeven)
+                if moved_to_breakeven:
+                    new_stop_candidate = None
+                    if direction == "BUY":
+                        target_stop = current_price - trail_distance
+                        if target_stop > (current_stop + step_size):
+                            new_stop_candidate = round(target_stop, 1)
+                    elif direction == "SELL":
+                        target_stop = current_price + trail_distance
+                        if target_stop < (current_stop - step_size):
+                            new_stop_candidate = round(target_stop, 1)
+
+                    if new_stop_candidate:
+                        logger.info(f"Trailing Stop Update: {new_stop_candidate}")
+                        if await self._update_stop_loss(deal_id, new_stop_candidate):
+                            current_stop = new_stop_candidate
+
+    async def _update_stop_loss(self, deal_id: str, new_stop: float) -> bool:
+        try:
+            await self.ig_client.update_open_position(
+                deal_id,
+                stop_level=new_stop,
+                env_type=settings.TRADING_ACCOUNT_ENV,
+            )
+            await self._update_execution_stop(deal_id, new_stop)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update stop for {deal_id}: {e}")
+            return False
 
     async def _is_position_open(self, deal_id: str) -> bool:
         """Checks if the deal is still in the open positions list."""
@@ -176,26 +249,125 @@ class TradeExecutor:
 
     async def _sync_outcome(self, deal_id: str):
         """Fetches final outcome from IG history and updates DB."""
+        # Wait a moment for IG to index the transaction
+        await asyncio.sleep(5)
+
         try:
-            # We assume it closed recently
-            await self.ig_client.fetch_transaction_history(
-                max_span_seconds=3600 * 24,  # 24h
+            # We assume it closed recently (look back 24h)
+            history = await self.ig_client.fetch_transaction_history(
+                max_span_seconds=3600 * 24,
                 env_type=settings.TRADING_ACCOUNT_ENV,
             )
 
-            # TODO: Parse 'transactions' to find exact PnL and Exit Price.
-            # For now, just mark CLOSED.
+            transactions = history.get("transactions", [])
 
+            # Find the closing transaction for this deal
+            # IG History: 'reference' often points to the closing deal ref, 'dealId' is the closing deal ID.
+            # We look for a transaction where we can link it.
+            # Often the easiest way is matching the instrument and direction/size reversely, or just latest close.
+            # But specific deal linking is tricky.
+            # However, if we just closed it, it should be the most recent one.
+
+            # Better strategy: Look for a transaction that mentions our deal_id?
+            # Or just assume the latest transaction for this Epic?
+            # We don't have epic here easily without querying DB or passing it.
+            # Let's rely on finding a transaction that matches the deal_id if possible?
+            # IG V2 History JSON: { transactions: [ { date, dealId, reference, ... } ] }
+            # Usually 'dealId' in history is unique for that transaction.
+
+            # If the trade was closed by a Stop/Limit, the system generates a NEW deal ID for the closing leg.
+            # But we might find the "Profit/Loss" entry.
+
+            for tx in transactions:
+                # Basic match attempt: if PnL is non-zero, it's a candidate
+                pnl_str = tx.get("profitAndLoss", "0")
+                if pnl_str == "0":
+                    continue
+
+                # If we could match Epic or something...
+                # For now, let's take the most recent closing transaction if it looks plausible?
+                # This is risky.
+
+                # Let's try to match via DB query first to get the Epic
+                pass
+
+            # Re-query DB to get context
             async with db_session.async_session_maker() as session:
                 stmt = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
                 result = await session.execute(stmt)
                 execution = result.scalars().first()
+
                 if execution:
-                    execution.outcome_status = "CLOSED"
-                    execution.exit_time = datetime.now(timezone.utc)
-                    session.add(execution)
-                    await session.commit()
-                    logger.info(f"Deal {deal_id} marked as CLOSED in DB.")
+                    # Now we have execution context (fill_price, direction, size)
+                    # We can try to match in history
+
+                    for tx in transactions:
+                        # Check PnL presence
+                        pnl_str = tx.get("profitAndLoss", "")
+                        if not pnl_str or pnl_str == "0":
+                            continue
+
+                        # Parse PnL
+                        try:
+                            clean_pnl = float(
+                                pnl_str.replace("£", "")
+                                .replace("$", "")
+                                .replace(",", "")
+                            )
+                        except ValueError:
+                            continue
+
+                        # Parse Signed Size for Direction
+                        # IG History Size: "+0.50" (BUY) or "-0.50" (SELL)
+                        tx_size_str = tx.get("size", "")
+                        if not tx_size_str:
+                            continue
+
+                        # The closing transaction has the OPPOSITE sign of the opening position.
+                        # Opening BUY (+ size in position) -> Closing transaction is - size (SELL)
+                        # Opening SELL (- size in position) -> Closing transaction is + size (BUY)
+
+                        is_plus = tx_size_str.startswith("+")
+                        is_minus = tx_size_str.startswith("-")
+
+                        open_dir = execution.direction.upper()  # BUY or SELL
+
+                        # Logic:
+                        # If we opened BUY, we expect a '-' transaction to close.
+                        # If we opened SELL, we expect a '+' transaction to close.
+                        if open_dir == "BUY" and not is_minus:
+                            continue
+                        if open_dir == "SELL" and not is_plus:
+                            continue
+
+                        # Also check if reference matches or if it's the right instrument
+                        # Note: In the logs, 'reference' often matches our opening deal_id
+                        tx_ref = tx.get("reference")
+                        if tx_ref and tx_ref != deal_id:
+                            # If it doesn't match the deal_id, it might be a different trade
+                            continue
+
+                        # Found a match!
+                        final_pnl = clean_pnl
+
+                        # Extract Exit Price
+                        close_level = tx.get("closeLevel") or tx.get("level")
+                        final_exit = float(close_level) if close_level else 0.0
+
+                        # Update DB
+                        execution.outcome_status = "WIN" if final_pnl > 0 else "LOSS"
+                        execution.pnl = final_pnl
+                        execution.exit_price = final_exit
+                        execution.exit_time = datetime.now(timezone.utc)
+
+                        session.add(execution)
+                        await session.commit()
+                        logger.info(
+                            f"Deal {deal_id} synced: PnL={final_pnl}, Exit={final_exit}"
+                        )
+                        return
+
+            logger.warning(f"Could not find matching history for {deal_id}")
 
         except Exception as e:
             logger.error(f"Failed to sync outcome for {deal_id}: {e}")

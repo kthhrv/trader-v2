@@ -4,7 +4,7 @@ import argparse
 from app.core.logger import logger, configure_logging, enable_notification_handler
 from app.database.session import init_db
 from app.core.markets import MARKET_CONFIGS
-from app.cli.trade import run_market_strategy
+from app.cli.trade import run_market_strategy, run_test_trade
 from app.cli.schedule import run_scheduler
 from app.cli.diagnostics import (
     run_post_mortem,
@@ -66,6 +66,18 @@ async def main():
         action="store_true",
         help="Send a test notification to Home Assistant",
     )
+    parser.add_argument(
+        "--test-trade",
+        action="store_true",
+        help="Execute an immediate test trade (BUY/SELL). Requires --market.",
+    )
+    parser.add_argument(
+        "--test-trade-action",
+        type=str,
+        choices=["BUY", "SELL"],
+        default="BUY",
+        help="Action for --test-trade: 'BUY' or 'SELL'. Defaults to BUY.",
+    )
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -91,6 +103,15 @@ async def main():
 
     if args.test_alert:
         await run_test_alert()
+        return
+
+    if args.test_trade:
+        if not args.market:
+            logger.error("Please specify --market with --test-trade")
+            return
+        await run_test_trade(
+            args.market, args.test_trade_action, args.dry_run, args.yes
+        )
         return
 
     if args.post_mortem:

@@ -1,6 +1,6 @@
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
-from app.adapters.gemini_service import GeminiService, Action
+from app.adapters.gemini_service import GeminiService, Action, TradingSignal, EntryType
 from app.adapters.news_client import NewsClient
 from app.services.collector import CollectorService
 from app.services.market_data import MarketDataService
@@ -10,6 +10,95 @@ from app.services.risk import RiskManager
 from app.services.analyzer import MarketAnalyzer
 from app.services.executor import TradeExecutor
 from app.core.markets import MARKET_CONFIGS
+
+
+async def run_test_trade(
+    market_key: str, action: str = "BUY", dry_run: bool = False, yes: bool = False
+):
+    """
+    Executes an immediate TEST trade with minimal size.
+    Bypasses AI analysis.
+    """
+    logger.info(
+        f"--- STARTING TEST TRADE for {market_key}, Action: {action} (Dry Run: {dry_run}) ---"
+    )
+
+    config = MARKET_CONFIGS.get(market_key)
+    if not config:
+        logger.error(f"Unknown market key: {market_key}")
+        return
+
+    epic = config["epic"]
+
+    async with AsyncIGClient() as ig_client:
+        try:
+            # 1. Fetch Market Details for Snapshot
+            market_details = await ig_client.fetch_market_details(epic)
+            if not market_details or "snapshot" not in market_details:
+                logger.error("Could not fetch market info for test trade.")
+                return
+
+            snapshot = market_details["snapshot"]
+            current_offer = float(snapshot["offer"])
+            current_bid = float(snapshot["bid"])
+
+            # 2. Determine Entry/Stop/TP
+            action_enum = Action.BUY if action.upper() == "BUY" else Action.SELL
+            entry_price = 0.0
+            stop_loss = 0.0
+            take_profit = 0.0
+
+            if action_enum == Action.BUY:
+                entry_price = current_offer
+                stop_loss = entry_price - 10.0
+                take_profit = entry_price + 20.0
+            else:
+                entry_price = current_bid
+                stop_loss = entry_price + 10.0
+                take_profit = entry_price - 20.0
+
+            # 3. Create Manual Signal
+            signal = TradingSignal(
+                ticker=epic,
+                action=action_enum,
+                entry=entry_price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                confidence="high",
+                reasoning="Manual Test Trade via CLI",
+                size=0.5,  # Minimal size
+                atr=5.0,  # Dummy ATR
+                entry_type=EntryType.INSTANT,
+                use_trailing_stop=True,
+            )
+
+            # Print Plan
+            print("\n" + "=" * 50)
+            print(f"TEST TRADE PLAN: {market_key} ({epic})")
+            print("=" * 50)
+            print(f"Action: {signal.action}")
+            print(f"Entry: {signal.entry}")
+            print(f"Stop: {signal.stop_loss}")
+            print(f"Target: {signal.take_profit}")
+            print(f"Size: {signal.size}")
+            print("-" * 50)
+
+            # 4. Confirm
+            if not yes and not dry_run:
+                confirm = input("\nExecute this test trade? [y/N]: ").strip().lower()
+                if confirm != "y":
+                    logger.info("Execution cancelled by user.")
+                    return
+
+            # 5. Execute
+            streamer = StreamerService(ig_client)
+            executor = TradeExecutor(ig_client, streamer, dry_run)
+
+            logger.info("Injecting Test Plan...")
+            await executor.execute_trade(signal, epic, None)
+
+        except Exception as e:
+            logger.exception(f"Test trade failed: {e}")
 
 
 async def run_market_strategy(
