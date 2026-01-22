@@ -31,8 +31,13 @@ async def test_strategy_engine_analyst_mode(mock_deps, monkeypatch):
     mock_analyzer.analyze_market = AsyncMock(return_value=mock_signal)
     mock_save = AsyncMock(return_value=MagicMock(id=123))
 
+    mock_status = MagicMock()
+    mock_status.is_holiday.return_value = False
+
     # Analyst Mode = True
-    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, analyst_mode=True)
+    engine = StrategyEngine(
+        mock_analyzer, mock_risk, mock_executor, mock_status, analyst_mode=True
+    )
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     await engine.run_strategy("london")

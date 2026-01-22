@@ -5,6 +5,7 @@ from app.adapters.gemini_service import TradingSignal, Action
 from app.services.analyzer import MarketAnalyzer
 from app.services.risk import RiskManager
 from app.services.executor import TradeExecutor
+from app.services.market_status import MarketStatusService
 from app.database import session as db_session
 from app.database.models import TradeSignal
 
@@ -15,17 +16,27 @@ class StrategyEngine:
         analyzer: MarketAnalyzer,
         risk_manager: RiskManager,
         executor: TradeExecutor,
+        market_status: MarketStatusService,
         analyst_mode: bool = False,
     ):
         self.analyzer = analyzer
         self.risk_manager = risk_manager
         self.executor = executor
+        self.market_status = market_status
         self.analyst_mode = analyst_mode
 
     async def run_strategy(self, market_key: str):
         """
         Orchestrates the strategy flow: Analyze -> Validate -> Execute.
         """
+        # 0. Check Holiday Status
+        config = MARKET_CONFIGS.get(market_key)
+        if config and self.market_status.is_holiday(config["epic"]):
+            logger.warning(
+                f"Market {market_key} is closed (Holiday). Skipping strategy."
+            )
+            return
+
         # 1. Analyze
         signal, signal_db = await self.generate_trade_signal(market_key)
         if not signal:
@@ -44,7 +55,6 @@ class StrategyEngine:
             return
 
         # 3. Execute
-        config = MARKET_CONFIGS.get(market_key)
         if config:
             await self.execute_trade_plan(
                 signal, config["epic"], signal_db.id if signal_db else None
@@ -55,6 +65,13 @@ class StrategyEngine:
     ) -> tuple[Optional[TradingSignal], Optional[TradeSignal]]:
         config = MARKET_CONFIGS.get(market_key)
         if not config:
+            return None, None
+
+        # Redundant check if called directly, but safe
+        if self.market_status.is_holiday(config["epic"]):
+            logger.warning(
+                f"Market {market_key} is closed (Holiday). Analysis aborted."
+            )
             return None, None
 
         logger.info(f"Generating Signal for {config['name']}...")

@@ -122,10 +122,15 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     market_analyzer = MarketAnalyzer(market_data, news_client, analyst)
     trade_executor = TradeExecutor(mock_ig, streamer, dry_run=False)
 
+    # Mock Market Status
+    mock_status = MagicMock()
+    mock_status.is_holiday.return_value = False
+
     engine = StrategyEngine(
         analyzer=market_analyzer,
         risk_manager=risk_manager,
         executor=trade_executor,
+        market_status=mock_status,
         analyst_mode=False,
     )
 

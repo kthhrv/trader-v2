@@ -337,6 +337,18 @@ wheels = [
 ]
 
 [[package]]
+name = "holidays"
+version = "0.89"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/7b/4edaf587b45eb5f59d791d1c88255fdaef6010119dd14683c827ad65bd12/holidays-0.89.tar.gz", hash = "sha256:9e7a08d9a704382be0ce70d148087aae95da51c0e77d73b4f8f1a17bdc3729bf", size = 829350, upload-time = "2026-01-19T20:01:14.484Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/84/854304ac830642625a050047096fdc9697c7e09c3645588aeb723488fc01/holidays-0.89-py3-none-any.whl", hash = "sha256:b132a10e8a112d97c17df042b2421c0e7a35f50e2f55975fceb4bd465bb6c658", size = 1348788, upload-time = "2026-01-19T20:01:12.889Z" },
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1096,6 +1108,7 @@ dependencies = [
     { name = "coverage" },
     { name = "feedparser" },
     { name = "google-genai" },
+    { name = "holidays" },
     { name = "httpx" },
     { name = "loguru" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
@@ -1127,6 +1140,7 @@ requires-dist = [
     { name = "coverage", specifier = ">=7.13.1" },
     { name = "feedparser", specifier = ">=6.0.12" },
     { name = "google-genai", specifier = ">=1.60.0" },
+    { name = "holidays", specifier = ">=0.89" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pandas", specifier = ">=2.3.3" },

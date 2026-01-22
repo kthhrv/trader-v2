@@ -9,6 +9,7 @@ from app.services.trader import StrategyEngine
 from app.services.risk import RiskManager
 from app.services.analyzer import MarketAnalyzer
 from app.services.executor import TradeExecutor
+from app.services.market_status import MarketStatusService
 from app.core.markets import MARKET_CONFIGS
 
 
@@ -128,11 +129,13 @@ async def run_market_strategy(
         risk_manager = RiskManager(ig_client)
         analyzer = MarketAnalyzer(market_data, news_client, analyst)
         executor = TradeExecutor(ig_client, streamer, dry_run)
+        market_status = MarketStatusService()
 
         engine = StrategyEngine(
             analyzer=analyzer,
             risk_manager=risk_manager,
             executor=executor,
+            market_status=market_status,
             analyst_mode=analyst_mode,
         )
 

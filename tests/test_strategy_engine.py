@@ -9,12 +9,14 @@ def mock_deps():
     mock_analyzer = MagicMock()
     mock_risk = MagicMock()
     mock_executor = MagicMock()
-    return mock_analyzer, mock_risk, mock_executor
+    mock_status = MagicMock()
+    return mock_analyzer, mock_risk, mock_executor, mock_status
 
 
 @pytest.mark.asyncio
 async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
-    mock_analyzer, mock_risk, mock_executor = mock_deps
+    mock_analyzer, mock_risk, mock_executor, mock_status = mock_deps
+    mock_status.is_holiday.return_value = False
 
     # 1. Analyze
     mock_signal = TradingSignal(
@@ -34,7 +36,7 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
     mock_risk.validate_signal = AsyncMock(return_value=True)
     mock_executor.execute_trade = AsyncMock()
 
-    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor)
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
 
     mock_save = AsyncMock(return_value=mock_db_signal)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
@@ -49,7 +51,8 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_strategy_engine_wait_action(mock_deps, monkeypatch):
-    mock_analyzer, mock_risk, mock_executor = mock_deps
+    mock_analyzer, mock_risk, mock_executor, mock_status = mock_deps
+    mock_status.is_holiday.return_value = False
 
     mock_signal = TradingSignal(
         ticker="FTSE100",
@@ -65,7 +68,7 @@ async def test_strategy_engine_wait_action(mock_deps, monkeypatch):
     mock_analyzer.analyze_market = AsyncMock(return_value=mock_signal)
     mock_save = AsyncMock(return_value=MagicMock(id=123))
 
-    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor)
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     await engine.run_strategy("london")
@@ -80,7 +83,8 @@ async def test_strategy_engine_dry_run(mock_deps):
 
 @pytest.mark.asyncio
 async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
-    mock_analyzer, mock_risk, mock_executor = mock_deps
+    mock_analyzer, mock_risk, mock_executor, mock_status = mock_deps
+    mock_status.is_holiday.return_value = False
 
     mock_signal = TradingSignal(
         ticker="FTSE100",
@@ -98,7 +102,7 @@ async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
     mock_risk.validate_signal = AsyncMock(return_value=False)  # Fail
     mock_save = AsyncMock(return_value=MagicMock(id=123))
 
-    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor)
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     await engine.run_strategy("london")
