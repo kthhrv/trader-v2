@@ -120,15 +120,15 @@ class MarketDataService:
 
     def _parse_resolution_to_seconds(self, resolution: str) -> int:
         mapping = {
-            "MIN": 60,
+            "MINUTE": 60,
             "1Min": 60,
-            "MIN_5": 300,
+            "MINUTE_5": 300,
             "5Min": 300,
-            "MIN_15": 900,
+            "MINUTE_15": 900,
             "15Min": 900,
-            "H": 3600,
+            "HOUR": 3600,
             "1H": 3600,
-            "D": 86400,
+            "DAY": 86400,
             "1D": 86400,
         }
         return mapping.get(resolution, 60)

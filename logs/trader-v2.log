@@ -298,3 +298,411 @@
   "confidence": "high",
   "reasoning": "Go"
 }
+2026-01-22 01:00:59 | ERROR    | __main__:main:179 - Please specify --market, --scheduler, or --post-mortem
+2026-01-22 01:01:14 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 01:01:14 | ERROR    | __main__:main:202 - Fatal error during execution: (sqlite3.OperationalError) no such table: historical_candles
+[SQL: SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, historical_candles.open, historical_candles.high, historical_candles.low, historical_candles.close, historical_candles.volume 
+FROM historical_candles 
+WHERE historical_candles.symbol = ? AND historical_candles.resolution = ? ORDER BY historical_candles.timestamp DESC
+ LIMIT ? OFFSET ?]
+[parameters: ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    │    │       └ <function DefaultDialect.do_execute at 0x748038d83060>
+    │    └ <sqlalchemy.dialects.sqlite.aiosqlite.SQLiteDialect_aiosqlite object at 0x748037e858e0>
+    └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    │      │       │          └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+    │      │       └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+    │      └ <function AsyncAdapt_aiosqlite_cursor.execute at 0x748037ec3560>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    │    └ <member '_adapt_connection' of 'AsyncAdapt_aiosqlite_cursor' objects>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 342, in _handle_exception
+    raise error
+          └ OperationalError('no such table: historical_candles')
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    │    │      │       │       │          └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+    │    │      │       │       └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+    │    │      │       └ <function Cursor.execute at 0x748037ee3060>
+    │    │      └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+    │    └ <member 'await_' of 'AsyncAdapt_aiosqlite_cursor' objects>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           │       │             └ <coroutine object Cursor.execute at 0x748002b02500>
+           │       └ <attribute 'parent' of 'greenlet.greenlet' objects>
+           └ <_AsyncIoGreenlet object at 0x7480034aabc0 (otid=0x7480395c31b0) dead>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+                  └ <coroutine object Cursor.execute at 0x748002b02500>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+          │    │        │    │       │        │    └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+          │    │        │    │       │        └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+          │    │        │    │       └ <method 'execute' of 'sqlite3.Cursor' objects>
+          │    │        │    └ <sqlite3.Cursor object at 0x7480034823c0>
+          │    │        └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+          │    └ <function Cursor._execute at 0x748037ee2fc0>
+          └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+                 │    │     │        │    │       └ {}
+                 │    │     │        │    └ ('SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histo...
+                 │    │     │        └ <built-in method execute of sqlite3.Cursor object at 0x7480034823c0>
+                 │    │     └ <function Connection._execute at 0x748037f00360>
+                 │    └ <aiosqlite.core.Connection object at 0x7480034a2ed0>
+                 └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/core.py", line 160, in _execute
+    return await future
+                 └ <Future finished exception=OperationalError('no such table: historical_candles')>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/core.py", line 63, in _connection_worker_thread
+    result = function()
+             └ functools.partial(<built-in method rollback of sqlite3.Connection object at 0x748003453970>)
+
+sqlite3.OperationalError: no such table: historical_candles
+
+
+The above exception was the direct cause of the following exception:
+
+
+Traceback (most recent call last):
+
+  File "/home/keith/ws/trader-folder/trader-v2/main.py", line 207, in <module>
+    asyncio.run(main())
+    │       │   └ <function main at 0x74800b9ba520>
+    │       └ <function run at 0x748039a57920>
+    └ <module 'asyncio' from '/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/__init__.py'>
+
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           │      │   └ <coroutine object main at 0x74800358b3d0>
+           │      └ <function Runner.run at 0x748039901c60>
+           └ <asyncio.runners.Runner object at 0x748039d46570>
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           │    │     │                  └ <Task pending name='Task-1' coro=<main() running at /home/keith/ws/trader-folder/trader-v2/main.py:202> cb=[_run_until_comple...
+           │    │     └ <function BaseEventLoop.run_until_complete at 0x748039aff880>
+           │    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+           └ <asyncio.runners.Runner object at 0x748039d46570>
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 678, in run_until_complete
+    self.run_forever()
+    │    └ <function BaseEventLoop.run_forever at 0x748039aff7e0>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 645, in run_forever
+    self._run_once()
+    │    └ <function BaseEventLoop._run_once at 0x748039901620>
+    └ <_UnixSelectorEventLoop running=True closed=False debug=False>
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 1999, in _run_once
+    handle._run()
+    │      └ <function Handle._run at 0x748039a43420>
+    └ <Handle Task.task_wakeup(<Future finished result=None>)>
+  File "/home/keith/.local/share/uv/python/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/asyncio/events.py", line 88, in _run
+    self._context.run(self._callback, *self._args)
+    │    │            │    │           │    └ <member '_args' of 'Handle' objects>
+    │    │            │    │           └ <Handle Task.task_wakeup(<Future finished result=None>)>
+    │    │            │    └ <member '_callback' of 'Handle' objects>
+    │    │            └ <Handle Task.task_wakeup(<Future finished result=None>)>
+    │    └ <member '_context' of 'Handle' objects>
+    └ <Handle Task.task_wakeup(<Future finished result=None>)>
+
+> File "/home/keith/ws/trader-folder/trader-v2/main.py", line 200, in main
+    await engine.run_strategy(args.market)
+          │      │            │    └ 'london'
+          │      │            └ Namespace(market='london', dry_run=False, analyst=True, post_mortem=None, init_db=False, scheduler=False)
+          │      └ <function StrategyEngine.run_strategy at 0x7480035a1620>
+          └ <app.services.trader.StrategyEngine object at 0x74800ac8a9c0>
+
+  File "/home/keith/ws/trader-folder/trader-v2/app/services/trader.py", line 52, in run_strategy
+    regime = await self._build_market_regime(epic)
+                   │    │                    └ 'IX.D.FTSE.DAILY.IP'
+                   │    └ <function StrategyEngine._build_market_regime at 0x7480035d9da0>
+                   └ <app.services.trader.StrategyEngine object at 0x74800ac8a9c0>
+
+  File "/home/keith/ws/trader-folder/trader-v2/app/services/trader.py", line 112, in _build_market_regime
+    candles_15m = await self.market_data.get_latest_candles(epic, "MIN_15", 50)
+                        │    │           │                  └ 'IX.D.FTSE.DAILY.IP'
+                        │    │           └ <function MarketDataService.get_latest_candles at 0x748036a54b80>
+                        │    └ <app.services.market_data.MarketDataService object at 0x7480036fecf0>
+                        └ <app.services.trader.StrategyEngine object at 0x74800ac8a9c0>
+
+  File "/home/keith/ws/trader-folder/trader-v2/app/services/market_data.py", line 45, in get_latest_candles
+    latest_result = await session.execute(stmt_latest)
+                          │       │       └ <sqlmodel.sql._expression_select_cls.SelectOfScalar object at 0x74800ab7f230>
+                          │       └ <function AsyncSession.execute at 0x748037e74cc0>
+                          └ <sqlalchemy.orm.session.AsyncSession object at 0x74800a548800>
+
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
+    result = await greenlet_spawn(
+                   └ <function greenlet_spawn at 0x74803963cfe0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             │       │      │   └ <built-in function exc_info>
+             │       │      └ <module 'sys' (built-in)>
+             │       └ <method 'throw' of 'greenlet.greenlet' objects>
+             └ <_AsyncIoGreenlet object at 0x7480034aabc0 (otid=0x7480395c31b0) dead>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           │    └ <function Session._execute_internal at 0x748038148d60>
+           └ <sqlalchemy.orm.session.Session object at 0x7480035c7c80>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                   │      │                 └ <classmethod(<function AbstractORMCompileState.orm_execute_statement at 0x7480383a3d80>)>
+                   │      └ <class 'sqlalchemy.orm.context.ORMSelectCompileState'>
+                   └ typing.Any
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             │    └ <function Connection.execute at 0x748038edfa60>
+             └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           └ <bound method ClauseElement._execute_on_connection of <sqlmodel.sql._expression_select_cls.SelectOfScalar object at 0x74800ab...
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           │          └ <function Connection._execute_clauseelement at 0x748038edfd80>
+           └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          │    └ <function Connection._execute_context at 0x748038edff60>
+          └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           │    └ <function Connection._exec_single_context at 0x748038ee0040>
+           └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    │    └ <function Connection._handle_dbapi_exception at 0x748038ee02c0>
+    └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+          │                    │              │                 └ OperationalError('no such table: historical_candles')
+          │                    │              └ (<class 'sqlite3.OperationalError'>, OperationalError('no such table: historical_candles'), <traceback object at 0x748002b0f8...
+          │                    └ <method 'with_traceback' of 'BaseException' objects>
+          └ OperationalError('(sqlite3.OperationalError) no such table: historical_candles')
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    │    │       └ <function DefaultDialect.do_execute at 0x748038d83060>
+    │    └ <sqlalchemy.dialects.sqlite.aiosqlite.SQLiteDialect_aiosqlite object at 0x748037e858e0>
+    └ <sqlalchemy.engine.base.Connection object at 0x74800354d250>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    │      │       │          └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+    │      │       └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+    │      └ <function AsyncAdapt_aiosqlite_cursor.execute at 0x748037ec3560>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 182, in execute
+    self._adapt_connection._handle_exception(error)
+    │    └ <member '_adapt_connection' of 'AsyncAdapt_aiosqlite_cursor' objects>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 342, in _handle_exception
+    raise error
+          └ OperationalError('no such table: historical_candles')
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 164, in execute
+    self.await_(_cursor.execute(operation, parameters))
+    │    │      │       │       │          └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+    │    │      │       │       └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+    │    │      │       └ <function Cursor.execute at 0x748037ee3060>
+    │    │      └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+    │    └ <member 'await_' of 'AsyncAdapt_aiosqlite_cursor' objects>
+    └ <sqlalchemy.dialects.sqlite.aiosqlite.AsyncAdapt_aiosqlite_cursor object at 0x7480034fcee0>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           │       │             └ <coroutine object Cursor.execute at 0x748002b02500>
+           │       └ <attribute 'parent' of 'greenlet.greenlet' objects>
+           └ <_AsyncIoGreenlet object at 0x7480034aabc0 (otid=0x7480395c31b0) dead>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+                  └ <coroutine object Cursor.execute at 0x748002b02500>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+          │    │        │    │       │        │    └ ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)
+          │    │        │    │       │        └ 'SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histor...
+          │    │        │    │       └ <method 'execute' of 'sqlite3.Cursor' objects>
+          │    │        │    └ <sqlite3.Cursor object at 0x7480034823c0>
+          │    │        └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+          │    └ <function Cursor._execute at 0x748037ee2fc0>
+          └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+                 │    │     │        │    │       └ {}
+                 │    │     │        │    └ ('SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, histo...
+                 │    │     │        └ <built-in method execute of sqlite3.Cursor object at 0x7480034823c0>
+                 │    │     └ <function Connection._execute at 0x748037f00360>
+                 │    └ <aiosqlite.core.Connection object at 0x7480034a2ed0>
+                 └ <aiosqlite.cursor.Cursor object at 0x748003406960>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/core.py", line 160, in _execute
+    return await future
+                 └ <Future finished exception=OperationalError('no such table: historical_candles')>
+  File "/home/keith/ws/trader-folder/trader-v2/.venv/lib/python3.12/site-packages/aiosqlite/core.py", line 63, in _connection_worker_thread
+    result = function()
+             └ functools.partial(<built-in method rollback of sqlite3.Connection object at 0x748003453970>)
+
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: historical_candles
+[SQL: SELECT historical_candles.id, historical_candles.symbol, historical_candles.resolution, historical_candles.timestamp, historical_candles.open, historical_candles.high, historical_candles.low, historical_candles.close, historical_candles.volume 
+FROM historical_candles 
+WHERE historical_candles.symbol = ? AND historical_candles.resolution = ? ORDER BY historical_candles.timestamp DESC
+ LIMIT ? OFFSET ?]
+[parameters: ('IX.D.FTSE.DAILY.IP', 'MIN_15', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-22 01:01:26 | INFO     | __main__:main:130 - Initializing Database...
+2026-01-22 01:01:26 | INFO     | __main__:main:132 - Database initialized.
+2026-01-22 01:01:29 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 01:01:29 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:01:29 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:01:29 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 01:01:29 | ERROR    | app.adapters.ig_client:authenticate:133 - IG Auth Failed (LIVE): {"errorCode":"error.security.api-key-invalid"}
+2026-01-22 01:01:29 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (MIN_15): HTTP 403: {"errorCode":"error.security.api-key-invalid"}
+2026-01-22 01:01:29 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:01:29 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:01:29 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 01:01:29 | ERROR    | app.adapters.ig_client:authenticate:133 - IG Auth Failed (LIVE): {"errorCode":"error.security.api-key-invalid"}
+2026-01-22 01:01:29 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (D): HTTP 403: {"errorCode":"error.security.api-key-invalid"}
+2026-01-22 01:01:29 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:01:29 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:03:00 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 01:03:00 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:03:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:03:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 01:03:00 | ERROR    | app.adapters.ig_client:authenticate:133 - IG Auth Failed (LIVE): {"errorCode":"error.security.api-key-missing"}
+2026-01-22 01:03:00 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (MIN_15): HTTP 400: {"errorCode":"error.security.api-key-missing"}
+2026-01-22 01:03:00 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:03:00 | INFO     | app.services.collector:collect_market_data:40 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:03:00 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with LIVE environment...
+2026-01-22 01:03:01 | ERROR    | app.adapters.ig_client:authenticate:133 - IG Auth Failed (LIVE): {"errorCode":"error.security.api-key-missing"}
+2026-01-22 01:03:01 | ERROR    | app.services.collector:collect_market_data:49 - Failed to collect data for IX.D.FTSE.DAILY.IP (D): HTTP 400: {"errorCode":"error.security.api-key-missing"}
+2026-01-22 01:03:01 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:03:01 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:03:23 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 01:03:23 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:03:23 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MIN_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:03:23 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:03:23 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: None
+2026-01-22 01:03:23 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.FTSE.DAILY.IP: 
+2026-01-22 01:03:23 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.FTSE.DAILY.IP (MIN_15): HTTP 404: 
+2026-01-22 01:03:23 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:03:23 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 D bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:03:23 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.FTSE.DAILY.IP: 
+2026-01-22 01:03:23 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.FTSE.DAILY.IP (D): HTTP 404: 
+2026-01-22 01:03:23 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:03:23 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:04:21 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 01:04:21 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:04:21 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:04:21 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:04:21 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: None
+2026-01-22 01:04:21 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.FTSE.DAILY.IP: 
+2026-01-22 01:04:21 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.FTSE.DAILY.IP (MINUTE_15): HTTP 404: 
+2026-01-22 01:04:21 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.FTSE.DAILY.IP (Missing/Insufficient history)
+2026-01-22 01:04:21 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.FTSE.DAILY.IP...
+2026-01-22 01:04:21 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.FTSE.DAILY.IP: 
+2026-01-22 01:04:21 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.FTSE.DAILY.IP (DAY): HTTP 404: 
+2026-01-22 01:04:21 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:04:21 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:04:32 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for Nasdaq 100 (IX.D.NASDAQ.CASH.IP)...
+2026-01-22 01:04:32 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:04:32 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:04:32 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:04:32 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: None
+2026-01-22 01:04:32 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP: 
+2026-01-22 01:04:32 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (MINUTE_15): HTTP 404: 
+2026-01-22 01:04:32 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:04:32 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:04:33 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP: 
+2026-01-22 01:04:33 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (DAY): HTTP 404: 
+2026-01-22 01:04:33 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:04:33 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:05:01 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for Nasdaq 100 (IX.D.NASDAQ.CASH.IP)...
+2026-01-22 01:05:01 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:01 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:01 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:05:01 | INFO     | app.adapters.ig_client:authenticate:128 - Auth Response Payload: {'accountType': 'SPREADBET', 'accountInfo': {'balance': 8021.27, 'deposit': 0.0, 'profitLoss': 0.0, 'available': 8021.27}, 'currencyIsoCode': 'GBP', 'currencySymbol': '£', 'currentAccountId': 'Z65PO9', 'lightstreamerEndpoint': 'https://demo-apd.marketdatasystems.com', 'accounts': [{'accountId': 'Z65PO8', 'accountName': 'CFD', 'preferred': False, 'accountType': 'CFD'}, {'accountId': 'Z65PO9', 'accountName': 'Spread bet', 'preferred': True, 'accountType': 'SPREADBET'}], 'clientId': '104544423', 'timezoneOffset': 0, 'hasActiveDemoAccounts': True, 'hasActiveLiveAccounts': True, 'trailingStopsEnabled': False, 'reroutingEnvironment': None, 'dealingEnabled': True}
+2026-01-22 01:05:01 | INFO     | app.adapters.ig_client:authenticate:129 - Successfully authenticated DEMO. Account: None
+2026-01-22 01:05:01 | ERROR    | app.adapters.ig_client:fetch_historical_prices:169 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP: 
+2026-01-22 01:05:01 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (MINUTE_15): HTTP 404: 
+2026-01-22 01:05:01 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:01 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:01 | ERROR    | app.adapters.ig_client:fetch_historical_prices:169 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP: 
+2026-01-22 01:05:01 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (DAY): HTTP 404: 
+2026-01-22 01:05:01 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:05:01 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:05:26 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for Nasdaq 100 (IX.D.NASDAQ.CASH.IP)...
+2026-01-22 01:05:26 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:26 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:26 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:05:26 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: Z65PO9
+2026-01-22 01:05:26 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP:  (URL: https://demo-api.ig.com/gateway/deal/prices/IX.D.NASDAQ.CASH.IP/MINUTE_15/50)
+2026-01-22 01:05:26 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (MINUTE_15): HTTP 404: 
+2026-01-22 01:05:26 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:26 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:26 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP:  (URL: https://demo-api.ig.com/gateway/deal/prices/IX.D.NASDAQ.CASH.IP/DAY/5)
+2026-01-22 01:05:26 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (DAY): HTTP 404: 
+2026-01-22 01:05:26 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:05:26 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:05:52 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for Nasdaq 100 (IX.D.NASDAQ.CASH.IP)...
+2026-01-22 01:05:52 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:52 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:52 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:05:52 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: Z65PO9
+2026-01-22 01:05:52 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP:  (URL: https://demo-api.ig.com/gateway/deal/prices/IX.D.NASDAQ.CASH.IP/MINUTE_15/50)
+2026-01-22 01:05:52 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (MINUTE_15): HTTP 404: 
+2026-01-22 01:05:52 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:05:52 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:05:52 | ERROR    | app.adapters.ig_client:fetch_historical_prices:168 - Failed to fetch prices for IX.D.NASDAQ.CASH.IP:  (URL: https://demo-api.ig.com/gateway/deal/prices/IX.D.NASDAQ.CASH.IP/DAY/5)
+2026-01-22 01:05:52 | ERROR    | app.services.collector:collect_market_data:53 - Failed to collect data for IX.D.NASDAQ.CASH.IP (DAY): HTTP 404: 
+2026-01-22 01:05:52 | WARNING  | app.services.trader:_build_market_regime:118 - Insufficient 15m data for analysis.
+2026-01-22 01:05:52 | ERROR    | app.services.trader:run_strategy:54 - Failed to build market regime. Aborting.
+2026-01-22 01:07:43 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:07:43 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: Z65PO9
+2026-01-22 01:07:44 | INFO     | __main__:main:182 - Search Results: {'markets': [{'epic': 'IX.D.NASDAQ.CASH.IP', 'instrumentName': 'US Tech 100', 'instrumentType': 'INDICES', 'expiry': 'DFB', 'high': 25441.9, 'low': 25326.4, 'percentageChange': 0.35, 'netChange': 89.1, 'updateTime': '01:07:43', 'updateTimeUTC': '01:07:43', 'bid': 25415.5, 'offer': 25417.5, 'delayTime': 0, 'streamingPricesAvailable': True, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'IX.D.NASDAQ.MONTH3.IP', 'instrumentName': 'US Tech 100', 'instrumentType': 'INDICES', 'expiry': 'MAR-26', 'high': 25583.5, 'low': 25470.5, 'percentageChange': 0.33, 'netChange': 85.1, 'updateTime': '01:07:43', 'updateTimeUTC': '01:07:43', 'bid': 25555.6, 'offer': 25558.6, 'delayTime': 0, 'streamingPricesAvailable': True, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'UC.D.NDAQ.DAILY.IP', 'instrumentName': 'NASDAQ OMX Group Inc (24 Hours)', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 9911.0, 'low': 9891.1, 'percentageChange': 1.64, 'netChange': 160.0, 'updateTime': '01:02:50', 'updateTimeUTC': '01:02:50', 'bid': 9889.1, 'offer': 9928.9, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'UC.D.NDAQ.MAR.IP', 'instrumentName': 'NASDAQ OMX Group Inc (24 Hours)', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 9998.7, 'low': 9928.7, 'percentageChange': 1.63, 'netChange': 160.0, 'updateTime': '01:02:50', 'updateTimeUTC': '01:02:50', 'bid': 9927.7, 'offer': 10016.5, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'UC.D.NDAQ.JUN.IP', 'instrumentName': 'NASDAQ OMX Group Inc (24 Hours)', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 10114.7, 'low': 10023.8, 'percentageChange': 1.61, 'netChange': 160.0, 'updateTime': '01:02:50', 'updateTimeUTC': '01:02:50', 'bid': 10022.8, 'offer': 10132.5, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'UC.D.NDAQ.SEP.IP', 'instrumentName': 'NASDAQ OMX Group Inc (24 Hours)', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': 10236.1, 'low': 10113.6, 'percentageChange': 1.6, 'netChange': 160.0, 'updateTime': '01:02:50', 'updateTimeUTC': '01:02:50', 'bid': 10112.6, 'offer': 10253.8, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'TRADEABLE', 'scalingFactor': 1}, {'epic': 'KA.D.USTLN.DAILY.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - UST', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '08:00:00', 'updateTimeUTC': '08:00:00', 'bid': 2743.0, 'offer': 2743.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLN.MAR.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - UST', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 2708.0, 'offer': 2718.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLN.JUN.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - UST', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 2741.0, 'offer': 2751.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLN.SEP.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - UST', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 2747.0, 'offer': 2759.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.QQQALN.DAILY.IP', 'instrumentName': 'UBS Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 2197.0, 'low': 2153.0, 'percentageChange': 0.5, 'netChange': 11.0, 'updateTime': '16:29:04', 'updateTimeUTC': '16:29:04', 'bid': 2190.0, 'offer': 2190.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQALN.MAR.IP', 'instrumentName': 'UBS Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 2211.0, 'low': 2167.0, 'percentageChange': 0.5, 'netChange': 11.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 2197.0, 'offer': 2211.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQALN.JUN.IP', 'instrumentName': 'UBS Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 2234.0, 'low': 2190.0, 'percentageChange': 0.48, 'netChange': 11.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 2220.0, 'offer': 2234.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQALN.SEP.IP', 'instrumentName': 'UBS Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': 2257.0, 'low': 2213.0, 'percentageChange': 0.47, 'netChange': 10.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 2243.0, 'offer': 2257.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'ED.D.CBNDXGY.DAILY.IP', 'instrumentName': 'ComStage ETF Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 10117.0, 'offer': 10167.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'ED.D.CBNDXGY.MAR.IP', 'instrumentName': 'ComStage ETF Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 10080.0, 'offer': 10202.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'ED.D.CBNDXGY.JUN.IP', 'instrumentName': 'ComStage ETF Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 9399.0, 'low': 9135.0, 'percentageChange': 3.13, 'netChange': 282.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 9252.0, 'offer': 9316.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'ED.D.CBNDXGY.SEP.IP', 'instrumentName': 'ComStage ETF Nasdaq-100 UCITS ETF', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 10106.0, 'offer': 10177.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UC.D.QQQCUS.DAILY.IP', 'instrumentName': 'Global X NASDAQ China Technology ETF', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': None, 'low': None, 'percentageChange': -0.36, 'netChange': -4.4, 'updateTime': '14:30:00', 'updateTimeUTC': '14:30:00', 'bid': 1225.0, 'offer': 1225.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UC.D.QQQCUS.MAR.IP', 'instrumentName': 'Global X NASDAQ China Technology ETF', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': None, 'low': None, 'percentageChange': -0.36, 'netChange': -4.4, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1226.5, 'offer': 1235.1, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UC.D.QQQCUS.JUN.IP', 'instrumentName': 'Global X NASDAQ China Technology ETF', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': None, 'low': None, 'percentageChange': -0.35, 'netChange': -4.4, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1243.2, 'offer': 1254.5, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UC.D.QQQCUS.SEP.IP', 'instrumentName': 'Global X NASDAQ China Technology ETF', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': None, 'low': None, 'percentageChange': -0.34, 'netChange': -4.4, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1259.4, 'offer': 1274.6, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLLN.DAILY.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - USTL', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '08:00:00', 'updateTimeUTC': '08:00:00', 'bid': 2026.25, 'offer': 2026.25, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLLN.MAR.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - USTL', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 1935.0, 'offer': 1945.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLLN.JUN.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - USTL', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 2023.0, 'offer': 2033.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'KA.D.USTLLN.SEP.IP', 'instrumentName': 'Lyxor UCITS ETF Nasdaq-100 - USTL', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': None, 'low': None, 'percentageChange': 0.0, 'netChange': 0.0, 'updateTime': '16:30:00', 'updateTimeUTC': '16:30:00', 'bid': 2027.0, 'offer': 2039.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UA.D.BIBUS.DAILY.IP', 'instrumentName': 'ProShares Ultra Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 8557.4, 'low': 8188.0, 'percentageChange': 4.84, 'netChange': 394.8, 'updateTime': '20:59:57', 'updateTimeUTC': '20:59:57', 'bid': 8543.1, 'offer': 8543.1, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UA.D.BIBUS.MAR.IP', 'instrumentName': 'ProShares Ultra Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 8632.6, 'low': 8221.8, 'percentageChange': 4.81, 'netChange': 394.8, 'updateTime': '00:00:32', 'updateTimeUTC': '00:00:32', 'bid': 8567.0, 'offer': 8627.2, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UA.D.BIBUS.JUN.IP', 'instrumentName': 'ProShares Ultra Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 8732.8, 'low': 8300.5, 'percentageChange': 4.76, 'netChange': 394.8, 'updateTime': '00:00:32', 'updateTimeUTC': '00:00:32', 'bid': 8649.1, 'offer': 8727.2, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UD.D.UBIOUS.DAILY.IP', 'instrumentName': 'ProShares UltraPro Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 1927.0, 'low': 1740.0, 'percentageChange': -5.82, 'netChange': -109.8, 'updateTime': '14:30:00', 'updateTimeUTC': '14:30:00', 'bid': 1776.5, 'offer': 1776.5, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UD.D.UBIOUS.MAR.IP', 'instrumentName': 'ProShares UltraPro Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 1726.0, 'low': 1366.0, 'percentageChange': 9.67, 'netChange': 145.0, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1639.0, 'offer': 1651.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UD.D.UBIOUS.JUN.IP', 'instrumentName': 'ProShares UltraPro Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 1937.0, 'low': 1743.0, 'percentageChange': -5.82, 'netChange': -110.1, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1776.0, 'offer': 1788.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UD.D.UBIOUS.SEP.IP', 'instrumentName': 'ProShares UltraPro Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': 1946.0, 'low': 1747.0, 'percentageChange': -5.78, 'netChange': -109.7, 'updateTime': '21:00:00', 'updateTimeUTC': '21:00:00', 'bid': 1781.0, 'offer': 1797.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'CLOSED', 'scalingFactor': 1}, {'epic': 'UA.D.BISUS.DAILY.IP', 'instrumentName': 'ProShares UltraShort Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 910.4, 'low': 873.7, 'percentageChange': -4.89, 'netChange': -45.0, 'updateTime': '20:59:50', 'updateTimeUTC': '20:59:50', 'bid': 876.0, 'offer': 876.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UA.D.BISUS.MAR.IP', 'instrumentName': 'ProShares UltraShort Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 918.1, 'low': 877.6, 'percentageChange': -4.86, 'netChange': -45.0, 'updateTime': '00:00:32', 'updateTimeUTC': '00:00:32', 'bid': 878.5, 'offer': 884.6, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UA.D.BISUS.JUN.IP', 'instrumentName': 'ProShares UltraShort Nasdaq Biotechnology', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 928.7, 'low': 886.0, 'percentageChange': -4.81, 'netChange': -45.0, 'updateTime': '00:00:32', 'updateTimeUTC': '00:00:32', 'bid': 886.9, 'offer': 894.9, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQ3LN.DAILY.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 31105.0, 'low': 29495.0, 'percentageChange': -0.08, 'netChange': -25.0, 'updateTime': '16:29:59', 'updateTimeUTC': '16:29:59', 'bid': 30834.0, 'offer': 30834.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.LQQ3LN.MAR.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 23253.0, 'low': 22114.0, 'percentageChange': 0.7, 'netChange': 162.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 23226.0, 'offer': 23236.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQ3LN.JUN.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 31636.0, 'low': 29996.0, 'percentageChange': -0.08, 'netChange': -25.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 31353.0, 'offer': 31365.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.LQQ3LN.JUN.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 23499.0, 'low': 22346.0, 'percentageChange': 0.7, 'netChange': 162.0, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 23470.0, 'offer': 23482.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.QQQSLN.MAR.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily  Short', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 311.73, 'low': 293.5, 'percentageChange': -0.37, 'netChange': -1.1, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 295.91, 'offer': 298.28, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.LQQSLN.DAILY.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily Short', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 229.98, 'low': 217.65, 'percentageChange': -0.79, 'netChange': -1.75, 'updateTime': '16:29:56', 'updateTimeUTC': '16:29:56', 'bid': 218.65, 'offer': 218.65, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.LQQSLN.MAR.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily Short', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 231.8, 'low': 218.72, 'percentageChange': -0.79, 'netChange': -1.75, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 219.17, 'offer': 220.93, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'KA.D.LQQSLN.JUN.IP', 'instrumentName': 'WisdomTree NASDAQ 100 3x Daily Short', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 234.36, 'low': 220.91, 'percentageChange': -0.78, 'netChange': -1.75, 'updateTime': '17:00:00', 'updateTimeUTC': '17:00:00', 'bid': 221.37, 'offer': 223.37, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UC.D.QDTYUS.DAILY.IP', 'instrumentName': 'YieldMax Nasdaq 100 0DTE Covered Call Strategy ETF', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 4278.4, 'low': 4223.2, 'percentageChange': 0.12, 'netChange': 5.1, 'updateTime': '20:59:59', 'updateTimeUTC': '20:59:59', 'bid': 4265.1, 'offer': 4265.1, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UC.D.QDTYUS.MAR.IP', 'instrumentName': 'YieldMax Nasdaq 100 0DTE Covered Call Strategy ETF', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 4314.6, 'low': 4241.8, 'percentageChange': 0.12, 'netChange': 5.1, 'updateTime': '00:39:21', 'updateTimeUTC': '00:39:21', 'bid': 4277.1, 'offer': 4307.1, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UC.D.QDTYUS.JUN.IP', 'instrumentName': 'YieldMax Nasdaq 100 0DTE Covered Call Strategy ETF', 'instrumentType': 'SHARES', 'expiry': 'JUN-26', 'high': 4364.6, 'low': 4282.4, 'percentageChange': 0.12, 'netChange': 5.2, 'updateTime': '00:39:21', 'updateTimeUTC': '00:39:21', 'bid': 4318.0, 'offer': 4357.1, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UC.D.QDTYUS.SEP.IP', 'instrumentName': 'YieldMax Nasdaq 100 0DTE Covered Call Strategy ETF', 'instrumentType': 'SHARES', 'expiry': 'SEP-26', 'high': 4416.9, 'low': 4320.8, 'percentageChange': 0.12, 'netChange': 5.1, 'updateTime': '00:39:21', 'updateTimeUTC': '00:39:21', 'bid': 4356.7, 'offer': 4409.3, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UB.D.GRIDUS.DAILY.IP', 'instrumentName': 'First Trust NASDAQ Clean Edge Smart Grid Infrastructure Index Fund (US)', 'instrumentType': 'SHARES', 'expiry': 'DFB', 'high': 15955.0, 'low': 15653.0, 'percentageChange': 1.19, 'netChange': 187.0, 'updateTime': '20:59:59', 'updateTimeUTC': '20:59:59', 'bid': 15884.0, 'offer': 15884.0, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}, {'epic': 'UB.D.GRIDUS.MAR.IP', 'instrumentName': 'First Trust NASDAQ Clean Edge Smart Grid Infrastructure Index Fund (US)', 'instrumentType': 'SHARES', 'expiry': 'MAR-26', 'high': 16103.9, 'low': 15708.7, 'percentageChange': 1.18, 'netChange': 187.0, 'updateTime': '00:06:15', 'updateTimeUTC': '00:06:15', 'bid': 15928.5, 'offer': 16040.4, 'delayTime': 0, 'streamingPricesAvailable': False, 'marketStatus': 'EDITS_ONLY', 'scalingFactor': 1}]}
+2026-01-22 01:08:04 | INFO     | app.services.trader:run_strategy:49 - Starting Strategy Run for Nasdaq 100 (IX.D.NASDAQ.CASH.IP)...
+2026-01-22 01:08:04 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:08:04 | INFO     | app.services.collector:collect_market_data:41 - Collecting 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:08:04 | INFO     | app.adapters.ig_client:authenticate:101 - Authenticating AsyncIGClient with DEMO environment...
+2026-01-22 01:08:04 | INFO     | app.adapters.ig_client:authenticate:128 - Successfully authenticated DEMO. Account: Z65PO9
+2026-01-22 01:08:04 | INFO     | app.services.collector:_process_and_save:105 - Saved 50 MINUTE_15 bars for IX.D.NASDAQ.CASH.IP
+2026-01-22 01:08:04 | INFO     | app.services.market_data:get_latest_candles:94 - Full fetch triggered for IX.D.NASDAQ.CASH.IP (Missing/Insufficient history)
+2026-01-22 01:08:04 | INFO     | app.services.collector:collect_market_data:41 - Collecting 5 DAY bars for IX.D.NASDAQ.CASH.IP...
+2026-01-22 01:08:04 | INFO     | app.services.collector:_process_and_save:105 - Saved 5 DAY bars for IX.D.NASDAQ.CASH.IP
+2026-01-22 01:08:04 | INFO     | app.services.trader:run_strategy:59 - Fetching news for query: Nasdaq 100 US Tech Sector
+2026-01-22 01:08:26 | INFO     | app.adapters.gemini_service:_generate_structured:106 - Gemini Thoughts: **The Decision to Wait: A Deep Dive into Low Volatility and Protocol Adherence**
+
+Okay, here's the deal. I'm a momentum trader, specializing in "Open Drive" breakouts on the Nasdaq 100, ticker IX.D.NASDAQ.CASH.IP. The current market is at 25413.0, and the trend is bullish, with the EMA20 at 25372.85. Momentum (62.96) is positive, though the average is at 70.03. The ATR is 40.57, which is low compared to the average of 70.03, and the low volatility is apparent (0.58 ratio). We're essentially flat (+0.01%) at the open. The news flow is extremely positive, indices are up, tech is leading, and geopolitical tensions are easing. This should be prime ground for an “Open Drive”, right?
+
+But, here's the rub. Rule 1 of my trading protocol dictates that when volatility is low (ATR < Avg), I should *favor mean reversion or wait*. My gut wants to go long given the news and the bullish trend, but the protocol is telling me to hold back. Rule 2, the Extension Rule, shows that the entry is not overextended. Rule 3 sets the Stop Loss, which I've calculated (25352.14). Rule 4 keeps the Stop Loss in range due to low volatility. Rule 5 (trailing stop) suggests "false" for range days, which this appears to be.
+
+The market regime is clearly low volatility. Despite the positive news, this sets a "WAIT" signal as the most logical action under the protocol. While the news is excellent, the low ATR suggests the "Open Drive" isn't likely today, and the protocol *explicitly* says to favor waiting when volatility is suppressed. So, I need to check the schema of the JSON to ensure that my output is complete.
+
+I went through the mental checklist to see if there was any viable path to a "BUY" signal given the bullish news and the extension, but the core of my specialist strategy is centered around "Open Drive", which requires momentum. The setup does not appear to be showing initial momentum.
+
+The protocol wins here. Even with bullish news, the low volatility regime *demands* a wait-and-see approach or a lean towards mean reversion. I’m thinking, “Okay, if I’m waiting, what is my Stop Loss and Size?”. This is set as 0. The take-profit, in this instance, is `null` (because there’s no immediate drive). Low volatility dictates no trailing stops. I keep coming back to this: I’m *specifying* that the volatility is low.
+
+So, I will generate the JSON, the final form, as asked.
+
+My final reasoning, per the protocol, is: "Market regime identified as Low Volatility (ATR 40.57 < Avg 70.03). Per protocol Rule 1, breakouts are avoided in favor of WAIT or mean reversion during suppressed volatility. While global news is bullish, the lack of immediate range expansion suggests an absence of 'Open Drive' momentum." I had to double-check every field, every calculation, and ensure that the schema is met, and the strings are formatted correctly. No comments or control tokens. I have confirmed: TICKER, ACTION, ENTRY, ENTRY_TYPE, STOP_LOSS, TAKE_PROFIT, SIZE, ATR, USE_TRAILING_STOP, CONFIDENCE and REASONING. Everything is there.
+
+And, even though the news is super bullish, this all points to "WAIT". Time to trust my risk management.
+
+
+
+2026-01-22 01:08:26 | INFO     | app.services.trader:run_strategy:72 - AI Decision: Action.WAIT | Conf: LOW
+2026-01-22 01:08:26 | INFO     | app.services.trader:run_strategy:78 - ANALYST REPORT:
+{
+  "ticker": "IX.D.NASDAQ.CASH.IP",
+  "action": "WAIT",
+  "entry": 25413.0,
+  "entry_type": "INSTANT",
+  "stop_loss": 25352.15,
+  "take_profit": null,
+  "size": 0.0,
+  "atr": 40.57,
+  "use_trailing_stop": false,
+  "confidence": "LOW",
+  "reasoning": "Market regime is classified as Low Volatility because the current ATR of 40.57 is significantly below the average of 70.03. According to the Market Analysis Protocol (Rule 1), traders should favor mean reversion or WAIT during low volatility environments. Despite the bullish technical trend and positive news sentiment regarding tech sector gains and cooling geopolitical tensions, the absence of initial range expansion suggests a high-probability Open Drive breakout is unlikely to manifest in the current session."
+}

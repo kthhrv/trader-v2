@@ -126,7 +126,7 @@ class AsyncIGClient:
                 # Fetch account ID if not explicitly set (optional check)
                 account_info = response.json()
                 logger.info(
-                    f"Successfully authenticated {env_type}. Account: {account_info.get('accountId')}"
+                    f"Successfully authenticated {env_type}. Account: {account_info.get('currentAccountId')}"
                 )
 
             except httpx.HTTPStatusError as e:
@@ -157,15 +157,17 @@ class AsyncIGClient:
 
         # IG Resolution mapping if needed, but usually matches (e.g., MIN, MIN_5, etc.)
         # For now assuming resolution is passed correctly per IG API
-        url = f"/prices/{epic}/{resolution}/{num_points}"
-        headers = {"VERSION": "3"}
+        url = f"prices/{epic}/{resolution}/{num_points}"
+        headers = {"VERSION": "2"}
 
         try:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            logger.error(f"Failed to fetch prices for {epic}: {e.response.text}")
+            logger.error(
+                f"Failed to fetch prices for {epic}: {e.response.text} (URL: {e.request.url})"
+            )
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
     @retry(
@@ -191,8 +193,8 @@ class AsyncIGClient:
         client = await self._get_session(env_type)
 
         # URL format for date range: /prices/{epic}/{resolution}/{startDate}/{endDate}
-        url = f"/prices/{epic}/{resolution}/{start_date}/{end_date}"
-        headers = {"VERSION": "3"}
+        url = f"prices/{epic}/{resolution}/{start_date}/{end_date}"
+        headers = {"VERSION": "2"}
 
         try:
             response = await client.get(url, headers=headers)
@@ -201,6 +203,27 @@ class AsyncIGClient:
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch prices range for {epic}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
+
+    async def search_markets(
+        self, search_term: str, env_type: str = "LIVE"
+    ) -> Dict[str, Any]:
+        """
+        Searches for markets matching the term.
+        """
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        url = f"markets?searchTerm={search_term}"
+        headers = {"VERSION": "1"}
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Search failed: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def update_open_position(
         self,

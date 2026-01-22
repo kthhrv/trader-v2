@@ -117,6 +117,7 @@ async def main():
         action="store_true",
         help="Start the background scheduler for all markets",
     )
+    parser.add_argument("--debug-search", type=str, help="Search for markets (debug)")
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -174,7 +175,16 @@ async def main():
         await run_post_mortem(args.post_mortem)
         return
 
-    # 4. Single Market Run
+    # 4. Debug Search
+    if args.debug_search:
+        async with AsyncIGClient() as ig_client:
+            results = await ig_client.search_markets(
+                args.debug_search, env_type="DEMO"
+            )  # Force DEMO for debug
+            logger.info(f"Search Results: {results}")
+        return
+
+    # 5. Single Market Run
     if not args.market:
         logger.error("Please specify --market, --scheduler, or --post-mortem")
         sys.exit(1)

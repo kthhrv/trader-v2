@@ -109,10 +109,10 @@ class StrategyEngine:
         Fetches data and calculates indicators to form the Market Regime.
         """
         # Fetch 15m data for indicators (50 points)
-        candles_15m = await self.market_data.get_latest_candles(epic, "MIN_15", 50)
+        candles_15m = await self.market_data.get_latest_candles(epic, "MINUTE_15", 50)
 
         # Fetch Daily data for Gap context (5 points)
-        candles_daily = await self.market_data.get_latest_candles(epic, "D", 5)
+        candles_daily = await self.market_data.get_latest_candles(epic, "DAY", 5)
 
         if not candles_15m or len(candles_15m) < 20:
             logger.warning("Insufficient 15m data for analysis.")

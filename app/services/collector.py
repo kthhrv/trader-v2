@@ -8,6 +8,7 @@ from app.adapters.ig_client import AsyncIGClient
 from app.database.models import HistoricalCandle
 from app.database.session import async_session_maker
 from app.core.markets import MARKET_CONFIGS
+from app.core.config import settings
 from app.core.logger import logger
 
 
@@ -23,7 +24,7 @@ class CollectorService:
         """
         Fetches data for all configured markets across multiple resolutions.
         """
-        resolutions = ["MIN", "MIN_5", "MIN_15"]
+        resolutions = ["MINUTE", "MINUTE_5", "MINUTE_15"]
         tasks = []
 
         for market_id, config in MARKET_CONFIGS.items():
@@ -40,7 +41,10 @@ class CollectorService:
             logger.info(f"Collecting {num_points} {resolution} bars for {epic}...")
 
             raw_data = await self.ig_client.fetch_historical_prices(
-                epic=epic, resolution=resolution, num_points=num_points, env_type="LIVE"
+                epic=epic,
+                resolution=resolution,
+                num_points=num_points,
+                env_type=settings.DATA_ACCOUNT_ENV,
             )
 
             await self._process_and_save(raw_data, epic, resolution)
@@ -64,7 +68,7 @@ class CollectorService:
                 resolution=resolution,
                 start_date=start_date,
                 end_date=end_date,
-                env_type="LIVE",
+                env_type=settings.DATA_ACCOUNT_ENV,
             )
 
             await self._process_and_save(raw_data, epic, resolution)
