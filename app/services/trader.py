@@ -5,7 +5,7 @@ from app.adapters.gemini_service import TradingSignal, Action
 from app.services.analyzer import MarketAnalyzer
 from app.services.risk import RiskManager
 from app.services.executor import TradeExecutor
-from app.database.session import async_session_maker
+from app.database import session as db_session
 from app.database.models import TradeSignal
 
 
@@ -66,14 +66,14 @@ class StrategyEngine:
         logger.info(f"AI Decision: {signal.action} | Conf: {signal.confidence}")
 
         # Save Signal
-        signal_db = await self._save_signal(signal, config["name"])
+        db_signal = await self._save_signal(signal, config["name"])
 
-        return signal, signal_db
+        return signal, db_signal
 
     async def _save_signal(
         self, signal: TradingSignal, strategy_name: str
     ) -> TradeSignal:
-        async with async_session_maker() as session:
+        async with db_session.async_session_maker() as session:
             db_signal = TradeSignal(
                 symbol=signal.ticker,
                 strategy_name=strategy_name,

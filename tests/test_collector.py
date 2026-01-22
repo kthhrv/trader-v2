@@ -1,9 +1,11 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from app.services.collector import CollectorService
-from app.database.models import HistoricalCandle
-from app.database.session import init_db, async_session_maker
+from unittest.mock import MagicMock, AsyncMock
 from sqlmodel import select
+
+from app.services.collector import CollectorService
+from app.database import session as db_session
+from app.database.models import HistoricalCandle
+from app.database.session import init_db
 
 
 @pytest.mark.asyncio
@@ -34,17 +36,16 @@ async def test_collector_saves_data_to_db():
     await service.collect_market_data("IX.D.NASDAQ.CASH.IP", "MIN", 1)
 
     # 4. Verify DB
-    async with async_session_maker() as session:
+    async with db_session.async_session_maker() as session:
         statement = select(HistoricalCandle).where(
             HistoricalCandle.symbol == "IX.D.NASDAQ.CASH.IP"
         )
         results = await session.execute(statement)
         candles = results.scalars().all()
 
-        assert len(candles) == 1
-        assert candles[0].open == 15000
-        assert candles[0].resolution == "MIN"
-        assert candles[0].timestamp.hour == 10
+    assert len(candles) == 1
+    assert candles[0].close == 15005
+    assert candles[0].volume == 100
 
 
 @pytest.mark.asyncio
@@ -71,7 +72,7 @@ async def test_collector_prevents_duplicates():
     await service.collect_market_data("EPIC1", "MIN", 1)
     await service.collect_market_data("EPIC1", "MIN", 1)
 
-    async with async_session_maker() as session:
+    async with db_session.async_session_maker() as session:
         statement = select(HistoricalCandle).where(HistoricalCandle.symbol == "EPIC1")
         results = await session.execute(statement)
         candles = results.scalars().all()

@@ -7,7 +7,7 @@ from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import TradingSignal, Action
 from app.services.streamer import StreamerService
-from app.database.session import async_session_maker
+from app.database import session as db_session
 from app.database.models import TradeExecution
 
 
@@ -151,7 +151,7 @@ class TradeExecutor:
     async def _save_execution(
         self, signal_id, deal_id, direction, fill_price, size, stop_loss
     ):
-        async with async_session_maker() as session:
+        async with db_session.async_session_maker() as session:
             execution = TradeExecution(
                 signal_id=signal_id,
                 deal_id=deal_id,
@@ -167,7 +167,7 @@ class TradeExecutor:
             logger.info(f"Execution saved for Deal {deal_id}")
 
     async def _update_execution_stop(self, deal_id: str, new_stop: float):
-        async with async_session_maker() as session:
+        async with db_session.async_session_maker() as session:
             stmt = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
             result = await session.execute(stmt)
             execution = result.scalars().first()

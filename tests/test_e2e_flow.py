@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 from sqlmodel import select
 from datetime import datetime, timedelta
 
-from app.database.session import init_db, async_session_maker
+from app.database import session as db_session
+from app.database.session import init_db
 from app.database.models import TradeExecution
 from app.adapters.gemini_service import GeminiService, TradingSignal, Action
 from app.adapters.news_client import NewsClient
@@ -120,7 +121,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     await engine.run_strategy("london")
 
     # 4. Verification
-    async with async_session_maker() as session:
+    async with db_session.async_session_maker() as session:
         execution = (await session.execute(select(TradeExecution))).scalars().first()
         assert execution is not None, "Trade execution not found in DB"
         assert execution.deal_id == "DEAL456"

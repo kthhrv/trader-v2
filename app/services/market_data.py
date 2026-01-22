@@ -5,7 +5,7 @@ from sqlmodel import select, desc
 
 from app.adapters.ig_client import AsyncIGClient
 from app.database.models import HistoricalCandle
-from app.database.session import async_session_maker
+from app.database import session as db_session
 from app.services.collector import CollectorService
 from app.core.logger import logger
 
@@ -31,7 +31,7 @@ class MarketDataService:
         Optimized to fetch only missing 'delta' if DB has recent data.
         """
         # 1. Check DB State
-        async with async_session_maker() as session:
+        async with db_session.async_session_maker() as session:
             # Get latest candle timestamp
             stmt_latest = (
                 select(HistoricalCandle)
@@ -107,7 +107,7 @@ class MarketDataService:
             )
 
         # 3. Return Final Result
-        async with async_session_maker() as session:
+        async with db_session.async_session_maker() as session:
             final_stmt = (
                 select(HistoricalCandle)
                 .where(
