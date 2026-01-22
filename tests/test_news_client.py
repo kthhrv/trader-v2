@@ -7,13 +7,16 @@ from app.adapters.news_client import NewsClient
 
 @pytest.mark.asyncio
 async def test_fetch_news_google_success(httpx_mock):
-    rss_content = """<?xml version="1.0" encoding="UTF-8"?>
+    from datetime import datetime, timezone
+
+    now_str = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    rss_content = f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0">
     <channel>
         <title>Google News</title>
         <item>
             <title>FTSE 100 Rises</title>
-            <pubDate>Wed, 21 Jan 2026 10:00:00 GMT</pubDate>
+            <pubDate>{now_str}</pubDate>
         </item>
     </channel>
     </rss>"""

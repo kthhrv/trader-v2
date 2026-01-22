@@ -15,6 +15,9 @@ from app.services.market_data import MarketDataService
 from app.services.streamer import StreamerService
 from app.services.trader import StrategyEngine
 from app.core.markets import MARKET_CONFIGS
+from app.services.risk import RiskManager
+from app.services.analyzer import MarketAnalyzer
+from app.services.executor import TradeExecutor
 
 
 async def run_market_strategy(market_key: str, dry_run: bool):
@@ -27,13 +30,16 @@ async def run_market_strategy(market_key: str, dry_run: bool):
         news_client = NewsClient()
         streamer = StreamerService(ig_client)
 
+        # Instantiate Services
+        risk_manager = RiskManager(ig_client)
+        analyzer = MarketAnalyzer(market_data, news_client, analyst)
+        executor = TradeExecutor(ig_client, streamer, dry_run)
+
         engine = StrategyEngine(
-            ig_client=ig_client,
-            market_data=market_data,
-            analyst=analyst,
-            news_client=news_client,
-            streamer=streamer,
-            dry_run=dry_run,
+            analyzer=analyzer,
+            risk_manager=risk_manager,
+            executor=executor,
+            analyst_mode=False,
         )
         # Scheduler runs fully automated logic (Generate -> Validate -> Execute)
         await engine.run_strategy(market_key)
@@ -242,13 +248,15 @@ async def main():
         news_client = NewsClient()
         streamer = StreamerService(ig_client)
 
+        # Instantiate Services
+        risk_manager = RiskManager(ig_client)
+        analyzer = MarketAnalyzer(market_data, news_client, analyst)
+        executor = TradeExecutor(ig_client, streamer, args.dry_run)
+
         engine = StrategyEngine(
-            ig_client=ig_client,
-            market_data=market_data,
-            analyst=analyst,
-            news_client=news_client,
-            streamer=streamer,
-            dry_run=args.dry_run,
+            analyzer=analyzer,
+            risk_manager=risk_manager,
+            executor=executor,
             analyst_mode=args.analyst,
         )
 

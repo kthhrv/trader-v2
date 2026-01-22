@@ -11,6 +11,9 @@ from app.services.market_data import MarketDataService
 from app.services.collector import CollectorService
 from app.services.streamer import StreamerService
 from app.services.trader import StrategyEngine
+from app.services.analyzer import MarketAnalyzer
+from app.services.risk import RiskManager
+from app.services.executor import TradeExecutor
 
 
 @pytest.mark.asyncio
@@ -34,8 +37,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     # Mock Position Update (Trailing Stop)
     mock_ig.update_open_position = AsyncMock(return_value={"status": "ACCEPTED"})
 
-    # Mock Historical Prices (Sequence: MINUTE_15, DAY)
-    # We need to construct the responses CollectorService expects
+    # Mock Historical Prices
     def make_candle(price, time_offset_min=0, time_offset_days=0):
         t = datetime.now() - timedelta(minutes=time_offset_min, days=time_offset_days)
         return {
@@ -56,7 +58,6 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     prices_1m = {"prices": [make_candle(7000, time_offset_min=i) for i in range(15)]}
     prices_day = {"prices": [make_candle(6900, time_offset_days=i) for i in range(5)]}
 
-    # Configure side_effect for fetch_historical_prices to return different data based on resolution
     async def fetch_prices_side_effect(epic, resolution, num_points, env_type="LIVE"):
         if resolution == "MINUTE_15":
             return prices_15m
@@ -71,9 +72,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     mock_ig.fetch_historical_prices = AsyncMock(side_effect=fetch_prices_side_effect)
 
     # 2. Instantiate Real Services with Mocked Adapter
-    # Collector needs the mock client
     collector = CollectorService(mock_ig)
-    # MarketData needs the mock client AND the collector
     market_data = MarketDataService(mock_ig, collector)
 
     news_client = MagicMock(spec=NewsClient)
@@ -97,42 +96,37 @@ async def test_full_trading_flow_e2e_mocked_adapter():
 
     streamer = MagicMock(spec=StreamerService)
 
-    # Generator yielding price ticks to trigger entry and trails
+    # Generator yielding price ticks
     async def mock_stream(epic):
-        # 1. Trigger Entry (Offer 7015 >= 7010)
         yield {"type": "price_update", "bid": 7000, "offer": 7015}
-        # 2. Trail 1: Price moves up to 7045. Target Stop = 7045 - 30 = 7015. (Initial 6990)
         yield {"type": "price_update", "bid": 7045, "offer": 7060}
-        # 3. Trail 2: Price moves up to 7080. Target Stop = 7080 - 30 = 7050.
         yield {"type": "price_update", "bid": 7080, "offer": 7095}
 
     streamer.stream = mock_stream
 
+    # Instantiate Sub-Services
+    risk_manager = RiskManager(mock_ig)
+    market_analyzer = MarketAnalyzer(market_data, news_client, analyst)
+    trade_executor = TradeExecutor(mock_ig, streamer, dry_run=False)
+
     engine = StrategyEngine(
-        ig_client=mock_ig,
-        market_data=market_data,
-        analyst=analyst,
-        news_client=news_client,
-        streamer=streamer,
-        dry_run=False,
+        analyzer=market_analyzer,
+        risk_manager=risk_manager,
+        executor=trade_executor,
+        analyst_mode=False,
     )
 
     # 3. Run Strategy
     await engine.run_strategy("london")
 
     # 4. Verification
-
-    # Verify DB State
     async with async_session_maker() as session:
         execution = (await session.execute(select(TradeExecution))).scalars().first()
         assert execution is not None, "Trade execution not found in DB"
         assert execution.deal_id == "DEAL456"
         assert execution.initial_stop_loss == 6990
-        # Final stop should be 7050 (After 2nd trail)
         assert execution.current_stop_loss == 7050
 
-    # Verify Calls
     assert mock_ig.create_order.called
     assert mock_ig.update_open_position.call_count == 2
-    # Verify risk check called
     assert mock_ig.get_account_balance.called
