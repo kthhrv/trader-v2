@@ -95,6 +95,16 @@ async def run_test_trade(
             streamer = StreamerService(ig_client)
             executor = TradeExecutor(ig_client, streamer, dry_run)
 
+            # Initialize Engine to save signal
+            collector = CollectorService(ig_client)
+            market_data = MarketDataService(ig_client, collector)
+            engine = StrategyEngine(
+                analyzer=MarketAnalyzer(market_data, NewsClient(), GeminiService()),
+                risk_manager=RiskManager(ig_client),
+                executor=executor,
+                market_status=MarketStatusService(),
+            )
+
             logger.info("Injecting Test Plan...")
             max_spread = config.get("max_spread")
             if max_spread is None:
@@ -103,7 +113,10 @@ async def run_test_trade(
                 )
                 return
 
-            await executor.execute_trade(signal, epic, None, max_spread)
+            # Save Signal for tracking
+            signal_db = await engine.save_manual_signal(signal, "TEST_TRADE")
+
+            await executor.execute_trade(signal, epic, signal_db.id, max_spread)
 
         except Exception as e:
             logger.exception(f"Test trade failed: {e}")

@@ -115,6 +115,12 @@ class StrategyEngine:
             await session.refresh(db_signal)
             return db_signal
 
+    async def save_manual_signal(
+        self, signal: TradingSignal, strategy_name: str
+    ) -> TradeSignal:
+        """Public wrapper for _save_signal to allow manual/test signal persistence."""
+        return await self._save_signal(signal, strategy_name)
+
     async def validate_signal(self, signal: TradingSignal) -> bool:
         return await self.risk_manager.validate_signal(signal)
 
