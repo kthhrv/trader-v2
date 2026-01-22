@@ -96,7 +96,14 @@ async def run_test_trade(
             executor = TradeExecutor(ig_client, streamer, dry_run)
 
             logger.info("Injecting Test Plan...")
-            await executor.execute_trade(signal, epic, None)
+            max_spread = config.get("max_spread")
+            if max_spread is None:
+                logger.error(
+                    f"Configuration Error: 'max_spread' not defined for {market_key}. Aborting."
+                )
+                return
+
+            await executor.execute_trade(signal, epic, None, max_spread)
 
         except Exception as e:
             logger.exception(f"Test trade failed: {e}")
@@ -189,8 +196,15 @@ async def run_market_strategy(
                 return
 
             # 4. Execute
+            max_spread = config.get("max_spread")
+            if max_spread is None:
+                logger.error(
+                    f"Configuration Error: 'max_spread' not defined for {market_key}. Aborting."
+                )
+                return
+
             await engine.execute_trade_plan(
-                signal, config["epic"], signal_db.id if signal_db else None
+                signal, config["epic"], signal_db.id if signal_db else None, max_spread
             )
 
         except Exception as e:

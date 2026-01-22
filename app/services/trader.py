@@ -56,8 +56,15 @@ class StrategyEngine:
 
         # 3. Execute
         if config:
+            max_spread = config.get("max_spread")
+            if max_spread is None:
+                logger.error(
+                    f"Configuration Error: 'max_spread' not defined for {config.get('name')}. Aborting."
+                )
+                return
+
             await self.execute_trade_plan(
-                signal, config["epic"], signal_db.id if signal_db else None
+                signal, config["epic"], signal_db.id if signal_db else None, max_spread
             )
 
     async def generate_trade_signal(
@@ -112,6 +119,10 @@ class StrategyEngine:
         return await self.risk_manager.validate_signal(signal)
 
     async def execute_trade_plan(
-        self, signal: TradingSignal, epic: str, signal_id: Optional[int]
+        self,
+        signal: TradingSignal,
+        epic: str,
+        signal_id: Optional[int],
+        max_spread: float,
     ):
-        await self.executor.execute_trade(signal, epic, signal_id)
+        await self.executor.execute_trade(signal, epic, signal_id, max_spread)

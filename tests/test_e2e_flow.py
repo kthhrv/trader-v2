@@ -32,7 +32,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
 
     # Mock Order Response
     mock_ig.create_order = AsyncMock(
-        return_value={"dealReference": "REF123", "dealId": "DEAL456", "level": 7015}
+        return_value={"dealReference": "REF123", "dealId": "DEAL456"}
     )
 
     # Mock Position Update (Trailing Stop)
@@ -99,8 +99,13 @@ async def test_full_trading_flow_e2e_mocked_adapter():
 
     # Generator yielding price ticks
     async def mock_stream(epic):
-        # Entry at 7015 (offer)
-        yield {"type": "price_update", "bid": 7010, "offer": 7015}
+        # 1. Wide Spread Tick (Should SKIP)
+        # Offer 7020 > Entry 7010 (Hit), but Spread 25 > 2.0 (Skip)
+        yield {"type": "price_update", "bid": 6995, "offer": 7020}
+
+        # 2. Valid Tick (Should EXECUTE)
+        # Entry at 7015 (offer), Bid 7013 (Spread 2.0 <= London max 2.0)
+        yield {"type": "price_update", "bid": 7013, "offer": 7015}
 
         # Risk is 7015 - 6990 = 25 points. 1.5R = 37.5 points.
         # Need price >= 7015 + 37.5 = 7052.5 to trigger breakeven.
@@ -158,6 +163,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         execution = (await session.execute(select(TradeExecution))).scalars().first()
         assert execution is not None, "Trade execution not found in DB"
         assert execution.deal_id == "DEAL456"
+        assert execution.fill_price == 7015
         assert execution.initial_stop_loss == 6990
         # Should have moved to BE (7015) then trailed to 7020
         assert execution.current_stop_loss == 7020

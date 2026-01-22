@@ -47,6 +47,7 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
     mock_risk.validate_signal.assert_called_once_with(mock_signal)
     mock_executor.execute_trade.assert_called_once()
     assert mock_executor.execute_trade.call_args[0][0] == mock_signal
+    assert mock_executor.execute_trade.call_args[0][3] == 2.0  # max_spread for london
 
 
 @pytest.mark.asyncio

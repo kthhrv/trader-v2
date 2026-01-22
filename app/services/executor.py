@@ -24,7 +24,11 @@ class TradeExecutor:
         self.dry_run = dry_run
 
     async def execute_trade(
-        self, signal: TradingSignal, epic: str, signal_id: Optional[int]
+        self,
+        signal: TradingSignal,
+        epic: str,
+        signal_id: Optional[int],
+        max_spread: float = 5.0,
     ):
         """
         Executes trade with 'Market if Touched' logic + Trailing Stop monitoring.
@@ -36,8 +40,12 @@ class TradeExecutor:
         direction = "BUY" if signal.action == Action.BUY else "SELL"
 
         # 1. Wait for Trigger
-        logger.info(f"Waiting for trigger: {direction} @ {signal.entry}...")
-        triggered_price = await self._wait_for_trigger(epic, direction, signal.entry)
+        logger.info(
+            f"Waiting for trigger: {direction} @ {signal.entry} (Max Spread: {max_spread})..."
+        )
+        triggered_price = await self._wait_for_trigger(
+            epic, direction, signal.entry, max_spread
+        )
 
         if not triggered_price:
             logger.warning("Trigger timeout. Trade aborted.")
@@ -105,10 +113,11 @@ class TradeExecutor:
             logger.error(f"Execution Failed: {e}")
 
     async def _wait_for_trigger(
-        self, epic: str, direction: str, target_entry: float
+        self, epic: str, direction: str, target_entry: float, max_spread: float
     ) -> Optional[float]:
         timeout = 5400
         start_time = datetime.now(timezone.utc).timestamp()
+        last_spread_warn_time = 0.0
 
         async for update in self.streamer.stream(epic):
             if (datetime.now(timezone.utc).timestamp() - start_time) > timeout:
@@ -118,6 +127,17 @@ class TradeExecutor:
                 bid = update.get("bid")
                 offer = update.get("offer")
                 if not bid or not offer:
+                    continue
+
+                # Spread Check
+                current_spread = round(abs(offer - bid), 2)
+                if current_spread > max_spread:
+                    now = datetime.now(timezone.utc).timestamp()
+                    if (now - last_spread_warn_time) > 10:
+                        logger.info(
+                            f"Spread {current_spread} > Max {max_spread}. Holding trigger."
+                        )
+                        last_spread_warn_time = now
                     continue
 
                 if direction == "BUY":
