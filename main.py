@@ -51,7 +51,6 @@ async def run_post_mortem(deal_id: str):
         execution = results.scalars().first()
 
         # Eager load the signal if available.
-        # Note: In pure async + lazy loading, this might need explict join or refresh
         if execution:
             await session.refresh(execution, ["signal"])
 
@@ -107,6 +106,9 @@ async def main():
         "--analyst", action="store_true", help="Generate trading plan without executing"
     )
     parser.add_argument(
+        "--news", action="store_true", help="Fetch and print news for the market"
+    )
+    parser.add_argument(
         "--post-mortem", type=str, help="Run post-mortem analysis on a deal ID"
     )
     parser.add_argument(
@@ -131,7 +133,12 @@ async def main():
         logger.info("Initializing Database...")
         await init_db()
         logger.info("Database initialized.")
-        if not args.market and not args.scheduler and not args.post_mortem:
+        if (
+            not args.market
+            and not args.scheduler
+            and not args.post_mortem
+            and not args.news
+        ):
             return
 
     # 2. Scheduler Mode
@@ -178,13 +185,48 @@ async def main():
     # 4. Debug Search
     if args.debug_search:
         async with AsyncIGClient() as ig_client:
-            results = await ig_client.search_markets(
-                args.debug_search, env_type="DEMO"
-            )  # Force DEMO for debug
+            results = await ig_client.search_markets(args.debug_search, env_type="DEMO")
             logger.info(f"Search Results: {results}")
         return
 
-    # 5. Single Market Run
+    # 5. News Fetching
+    if args.news:
+        if not args.market:
+            logger.error("Please specify --market with --news")
+            return
+
+        news_client = NewsClient()
+        config = MARKET_CONFIGS.get(args.market)
+        if not config:
+            logger.error(f"Invalid market: {args.market}")
+            return
+
+        epic = config["epic"]
+        query = "Global Financial Markets"
+
+        if "FTSE" in epic:
+            query = "FTSE 100 UK Economy"
+        elif "SPX" in epic or "US500" in epic or "SPTRD" in epic:
+            query = "S&P 500 US Economy"
+        elif "GBP" in epic:
+            query = "GBP USD Forex"
+        elif "EUR" in epic:
+            query = "EUR USD Forex"
+        elif "DAX" in epic:
+            query = "DAX 40 Germany Economy"
+        elif "NIKKEI" in epic:
+            query = "Nikkei 225 Japan Economy"
+        elif "ASX" in epic:
+            query = "ASX 200 Australia Economy"
+        elif "NASDAQ" in epic:
+            query = "Nasdaq 100 US Tech Sector"
+
+        print(f"Fetching news for: {query}...")
+        summary = await news_client.fetch_news(query, market=args.market)
+        print(summary)
+        return
+
+    # 6. Single Market Run
     if not args.market:
         logger.error("Please specify --market, --scheduler, or --post-mortem")
         sys.exit(1)
