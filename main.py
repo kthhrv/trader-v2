@@ -46,6 +46,9 @@ async def main():
     )
     parser.add_argument("--dry-run", action="store_true", help="Simulate trades")
     parser.add_argument(
+        "--analyst", action="store_true", help="Generate trading plan without executing"
+    )
+    parser.add_argument(
         "--init-db", action="store_true", help="Initialize database tables"
     )
     parser.add_argument(
@@ -124,6 +127,7 @@ async def main():
             news_client=news_client,
             streamer=streamer,
             dry_run=args.dry_run,
+            analyst_mode=args.analyst,
         )
 
         try:

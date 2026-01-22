@@ -164,3 +164,20 @@
 2026-01-22 00:47:05 | INFO     | app.services.trader:_execute_signal:192 - DRY RUN: Trade simulation successful.
 2026-01-22 00:47:05 | INFO     | app.services.trader:run_strategy:44 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
 2026-01-22 00:47:05 | ERROR    | app.services.trader:run_strategy:49 - Failed to build market regime. Aborting.
+2026-01-22 00:49:49 | INFO     | app.services.trader:run_strategy:46 - Starting Strategy Run for FTSE 100 (IX.D.FTSE.DAILY.IP)...
+2026-01-22 00:49:49 | INFO     | app.services.trader:run_strategy:56 - Fetching news for query: FTSE 100 UK Economy
+2026-01-22 00:49:49 | INFO     | app.services.trader:run_strategy:69 - AI Decision: Action.BUY | Conf: high
+2026-01-22 00:49:49 | INFO     | app.services.trader:run_strategy:72 - ANALYST REPORT:
+{
+  "ticker": "FTSE100",
+  "action": "BUY",
+  "entry": 7000.0,
+  "entry_type": "INSTANT",
+  "stop_loss": 6950.0,
+  "take_profit": null,
+  "size": 1.0,
+  "atr": 10.0,
+  "use_trailing_stop": true,
+  "confidence": "high",
+  "reasoning": "Go"
+}

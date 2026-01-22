@@ -23,6 +23,7 @@ class StrategyEngine:
         news_client: NewsClient,
         streamer: StreamerService,
         dry_run: bool = False,
+        analyst_mode: bool = False,
     ):
         self.ig_client = ig_client
         self.market_data = market_data
@@ -30,6 +31,7 @@ class StrategyEngine:
         self.news_client = news_client
         self.streamer = streamer
         self.dry_run = dry_run
+        self.analyst_mode = analyst_mode
 
     async def run_strategy(self, market_key: str):
         """
@@ -65,6 +67,10 @@ class StrategyEngine:
             return
 
         logger.info(f"AI Decision: {signal.action} | Conf: {signal.confidence}")
+
+        if self.analyst_mode:
+            logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
+            return
 
         if signal.action == Action.WAIT:
             return
