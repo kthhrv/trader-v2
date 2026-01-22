@@ -199,20 +199,26 @@ class StrategyEngine:
     ):
         """
         Executes the trade via IG Client.
+        Waits for price trigger if entry type is INSTANT (Market if Touched).
         """
-        logger.info(f"Executing {signal.action} for {epic}...")
-
         if self.dry_run:
             logger.info("DRY RUN: Trade simulation successful.")
             return
 
         direction = "BUY" if signal.action == Action.BUY else "SELL"
 
-        try:
-            # Note: We rely on the client to handle the order placement
-            # We might want to add size calc logic here or in client
-            # For now using signal size directly
+        # 1. Wait for Entry Trigger
+        logger.info(f"Waiting for trigger: {direction} @ {signal.entry}...")
+        triggered_price = await self._wait_for_trigger(epic, direction, signal.entry)
 
+        if not triggered_price:
+            logger.warning("Trigger timeout or cancellation. Trade aborted.")
+            return
+
+        logger.info(f"Triggered at {triggered_price}! Executing {direction}...")
+
+        try:
+            # 2. Place Order
             response = await self.ig_client.create_order(
                 epic=epic,
                 direction=direction,
@@ -225,29 +231,58 @@ class StrategyEngine:
 
             if "dealReference" in response:
                 deal_ref = response["dealReference"]
-                # In a real scenario, we'd wait for deal confirmation to get the Deal ID
-                # For now, we assume immediate success or use ref if dealId missing (IG API specific)
                 deal_id = response.get("dealId", deal_ref)
 
                 await self._save_execution(
                     signal_id=signal_id,
                     deal_id=deal_id,
                     direction=direction,
-                    fill_price=response.get(
-                        "level", signal.entry
-                    ),  # Use requested entry if level missing
+                    fill_price=response.get("level", triggered_price),
                     size=signal.size,
                     stop_loss=signal.stop_loss,
                 )
 
                 if signal.use_trailing_stop:
-                    # Block execution to monitor trade
                     await self._monitor_position(
                         deal_id, epic, direction, signal.stop_loss, signal.atr
                     )
 
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
+
+    async def _wait_for_trigger(
+        self, epic: str, direction: str, target_entry: float
+    ) -> Optional[float]:
+        """
+        Monitors stream until price touches the target entry.
+        Returns the trigger price if hit, or None if timed out.
+        """
+        timeout = 5400  # 90 minutes wait time
+        start_time = datetime.now(timezone.utc).timestamp()
+
+        async for update in self.streamer.stream(epic):
+            if (datetime.now(timezone.utc).timestamp() - start_time) > timeout:
+                logger.info("Entry trigger timed out.")
+                return None
+
+            if update.get("type") == "price_update":
+                bid = update.get("bid")
+                offer = update.get("offer")
+                if not bid or not offer:
+                    continue
+
+                # Check Trigger
+                if direction == "BUY":
+                    # Buy if Offer drops to target (Limit entry) or breaks above (Stop entry)?
+                    # "Market if Touched" usually means if price reaches level.
+                    # For a breakout BUY, we usually wait for price to go UP to the entry.
+                    if offer >= target_entry:
+                        return offer
+                elif direction == "SELL":
+                    # For breakout SELL, wait for price to go DOWN to entry.
+                    if bid <= target_entry:
+                        return bid
+        return None
 
     async def _monitor_position(
         self, deal_id: str, epic: str, direction: str, current_stop: float, atr: float

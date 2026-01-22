@@ -71,6 +71,21 @@ async def test_full_trading_flow_e2e(httpx_mock):
         json={"dealReference": "REF123", "dealId": "DEAL456", "level": 7010},
     )
 
+    # 4. Mock Trailing Stop Update (PUT)
+    # Register twice because the mock stream triggers two updates
+    httpx_mock.add_response(
+        method="PUT",
+        url=re.compile(r".*/positions/otc/DEAL456"),
+        status_code=200,
+        json={"dealReference": "REF_UPDATE_1"},
+    )
+    httpx_mock.add_response(
+        method="PUT",
+        url=re.compile(r".*/positions/otc/DEAL456"),
+        status_code=200,
+        json={"dealReference": "REF_UPDATE_2"},
+    )
+
     # Instantiate Stack
     async with AsyncIGClient() as ig_client:
         collector = CollectorService(ig_client)
@@ -90,15 +105,17 @@ async def test_full_trading_flow_e2e(httpx_mock):
                 atr=20.0,
                 use_trailing_stop=True,
                 confidence="high",
-                reasoning="Go",
+                reasoning="Strong momentum breakout",
             )
         )
 
         streamer = MagicMock(spec=StreamerService)
 
         async def mock_stream(epic):
-            if False:
-                yield {}
+            # Yield a price that triggers the BUY (Entry 7010)
+            yield {"type": "price_update", "bid": 7000, "offer": 7015}
+            # Keep yielding to allow monitor loop to start if needed, or stop
+            yield {"type": "price_update", "bid": 7020, "offer": 7025}
 
         streamer.stream = mock_stream
 
@@ -122,3 +139,4 @@ async def test_full_trading_flow_e2e(httpx_mock):
             executions = (await session.execute(select(TradeExecution))).scalars().all()
             assert len(executions) == 1
             assert executions[0].deal_id == "DEAL456"
+            assert executions[0].signal_id == signals[0].id

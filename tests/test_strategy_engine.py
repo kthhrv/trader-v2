@@ -43,6 +43,16 @@ def dummy_regime():
 async def test_strategy_engine_run_buy(mock_deps, dummy_regime, monkeypatch):
     mock_ig, mock_data, mock_analyst, mock_news, mock_streamer = mock_deps
 
+    # Mock stream to trigger BUY at 7000
+    async def trigger_stream(epic):
+        yield {
+            "type": "price_update",
+            "bid": 6990,
+            "offer": 7005,
+        }  # Trigger! (Offer >= 7000)
+
+    mock_streamer.stream = trigger_stream
+
     mock_analyst.analyze_market = AsyncMock(
         return_value=TradingSignal(
             ticker="FTSE100",
