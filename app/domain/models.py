@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, List
 from pydantic import BaseModel, ConfigDict
 
 
@@ -21,7 +21,7 @@ class MarketRegime(BaseModel):
     Encapsulates the technical state of the market.
     """
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, extra="allow")
 
     symbol: str
     timestamp: datetime
@@ -46,6 +46,11 @@ class MarketRegime(BaseModel):
     session_high: Optional[float] = None
     session_low: Optional[float] = None
     gap_percent: float
+
+    # Extra Context Data (Dynamically attached)
+    candles_5m: Optional[List[Any]] = None
+    candles_1m: Optional[List[Any]] = None
+    candles_daily: Optional[List[Any]] = None
 
     @property
     def is_high_volatility(self) -> bool:

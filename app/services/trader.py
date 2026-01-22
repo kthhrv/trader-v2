@@ -231,9 +231,6 @@ class StrategyEngine:
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
 
-    # ... Helper methods (_wait_for_trigger, _monitor_position, _save_signal, etc) remain same ...
-    # Need to include them in the file write
-
     def _get_news_query(self, epic: str) -> str:
         if "FTSE" in epic:
             return "FTSE 100 UK Economy"
@@ -255,8 +252,17 @@ class StrategyEngine:
             return "Global Financial Markets"
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
+        """
+        Fetches data and calculates indicators to form the Market Regime.
+        """
         # Fetch 15m data for indicators (50 points)
         candles_15m = await self.market_data.get_latest_candles(epic, "MINUTE_15", 50)
+
+        # Fetch 5m data for granular structure (24 points = 2 hours)
+        candles_5m = await self.market_data.get_latest_candles(epic, "MINUTE_5", 24)
+
+        # Fetch 1m data for precise timing (15 points = 15 mins)
+        candles_1m = await self.market_data.get_latest_candles(epic, "MINUTE", 15)
 
         # Fetch Daily data for Gap context (5 points)
         candles_daily = await self.market_data.get_latest_candles(epic, "DAY", 5)
@@ -311,7 +317,7 @@ class StrategyEngine:
         if prev_close > 0:
             gap_pct = ((latest["close"] - prev_close) / prev_close) * 100
 
-        return MarketRegime(
+        regime = MarketRegime(
             symbol=epic,
             timestamp=datetime.now(timezone.utc),
             current_price=latest["close"],
@@ -327,8 +333,26 @@ class StrategyEngine:
             gap_percent=gap_pct,
         )
 
+        # Attach additional timeframes to the regime object dynamically
+        setattr(regime, "candles_5m", candles_5m)
+        setattr(regime, "candles_1m", candles_1m)
+        setattr(regime, "candles_daily", candles_daily)
+
+        return regime
+
     def _format_context(self, regime: MarketRegime, news: str) -> str:
-        return f"""
+        # Helper to format candles
+        def fmt_candles(candles, limit=5):
+            if not candles:
+                return "No Data"
+            # Format: Time | Open | High | Low | Close
+            lines = ["Time (UTC) | Open | High | Low | Close"]
+            for c in candles[-limit:]:
+                ts = c.timestamp.strftime("%H:%M")
+                lines.append(f"{ts} | {c.open} | {c.high} | {c.low} | {c.close}")
+            return "\n".join(lines)
+
+        context = f"""
         Instrument: {regime.symbol}
         Price: {regime.current_price}
         Trend: {regime.trend} (EMA20: {regime.ema_20:.2f})
@@ -336,10 +360,23 @@ class StrategyEngine:
         ATR: {regime.atr_14:.2f} (Avg: {regime.avg_atr:.2f})
         Volatility: {regime.regime} (Ratio: {regime.volatility_ratio:.2f})
         Gap: {regime.gap_percent:+.2f}%
-        
-        News Summary:
-        {news}
         """
+
+        if regime.candles_5m:
+            context += f"\n\n--- 5-Minute Structure (Last 5) ---\n{fmt_candles(regime.candles_5m, 5)}"
+
+        if regime.candles_1m:
+            context += f"\n\n--- 1-Minute Timing (Last 5) ---\n{fmt_candles(regime.candles_1m, 5)}"
+
+        if regime.candles_daily:
+            lines = ["Date | Open | High | Low | Close"]
+            for c in regime.candles_daily[-5:]:
+                ts = c.timestamp.strftime("%Y-%m-%d")
+                lines.append(f"{ts} | {c.open} | {c.high} | {c.low} | {c.close}")
+            context += "\n\n--- Daily Context (Last 5) ---\n" + "\n".join(lines)
+
+        context += f"\n\nNews Summary:\n{news}\n"
+        return context
 
     async def _wait_for_trigger(
         self, epic: str, direction: str, target_entry: float

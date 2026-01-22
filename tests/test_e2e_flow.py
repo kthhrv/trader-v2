@@ -50,12 +50,20 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     prices_15m = {
         "prices": [make_candle(7000, time_offset_min=i * 15) for i in range(50)]
     }
+    prices_5m = {
+        "prices": [make_candle(7000, time_offset_min=i * 5) for i in range(24)]
+    }
+    prices_1m = {"prices": [make_candle(7000, time_offset_min=i) for i in range(15)]}
     prices_day = {"prices": [make_candle(6900, time_offset_days=i) for i in range(5)]}
 
     # Configure side_effect for fetch_historical_prices to return different data based on resolution
     async def fetch_prices_side_effect(epic, resolution, num_points, env_type="LIVE"):
         if resolution == "MINUTE_15":
             return prices_15m
+        elif resolution == "MINUTE_5":
+            return prices_5m
+        elif resolution == "MINUTE":
+            return prices_1m
         elif resolution == "DAY":
             return prices_day
         return {"prices": []}

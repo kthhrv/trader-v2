@@ -88,6 +88,10 @@ class MarketDataService:
                 # To be safe/simple, we trigger a full fetch here to backfill.
                 # Calculating exact backfill range is complex due to market hours.
                 should_fetch_full = True
+            else:
+                logger.info(
+                    f"Using cached data for {epic} ({len(existing_candles)} {resolution} bars)"
+                )
 
         # 2. Execute Fetch
         if should_fetch_full:
