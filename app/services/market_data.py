@@ -77,11 +77,11 @@ class MarketDataService:
             if age > max_age_seconds:
                 # Case 2: Data exists but is stale (gap at the end)
                 should_fetch_delta = True
-                delta_start = last_time.strftime("%Y-%m-%dT%H:%M:%S")
+                delta_start = last_time.strftime("%Y-%m-%d %H:%M:%S")
                 # Add slight buffer to end date (IG API handles 'now' implicitly if end is future,
                 # but safer to specify or let it infer. IG Range requires both usually.)
                 # We'll use Now + 1 minute to be safe
-                delta_end = (now + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
+                delta_end = (now + timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")
 
             elif len(existing_candles) < num_points:
                 # Case 3: Data is fresh, but we don't have enough history (gap at the start)

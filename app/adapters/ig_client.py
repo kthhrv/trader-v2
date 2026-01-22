@@ -211,7 +211,13 @@ class AsyncIGClient:
             accounts = response.json().get("accounts", [])
             if not accounts:
                 return 0.0
-            return float(accounts[0].get("balance", 0.0))
+
+            # The 'balance' field in the account object is itself a dictionary
+            # containing 'balance', 'deposit', 'profitLoss', and 'available'.
+            balance_data = accounts[0].get("balance", {})
+            if isinstance(balance_data, dict):
+                return float(balance_data.get("balance", 0.0))
+            return float(balance_data)
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch account balance: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
