@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlmodel import select, desc
@@ -28,15 +28,26 @@ class MarketDataService:
     ) -> List[HistoricalCandle]:
         """
         Retrieves the latest N candles.
-        Checks DB validity first; triggers API fetch if data is missing or stale.
-
-        Args:
-            max_age_seconds: If the latest candle in DB is older than this, force an API refresh.
-                             Defaults to resolution interval in seconds if None.
+        Optimized to fetch only missing 'delta' if DB has recent data.
         """
+        # 1. Check DB State
         async with async_session_maker() as session:
-            # 1. Query DB for existing candles
-            statement = (
+            # Get latest candle timestamp
+            stmt_latest = (
+                select(HistoricalCandle)
+                .where(
+                    HistoricalCandle.symbol == epic,
+                    HistoricalCandle.resolution == resolution,
+                )
+                .order_by(desc(HistoricalCandle.timestamp))
+                .limit(1)
+            )
+            latest_result = await session.execute(stmt_latest)
+            latest_candle = latest_result.scalars().first()
+
+            # Get count
+            # (Simplified: just query limit N to see if we have enough)
+            stmt_count = (
                 select(HistoricalCandle)
                 .where(
                     HistoricalCandle.symbol == epic,
@@ -45,62 +56,79 @@ class MarketDataService:
                 .order_by(desc(HistoricalCandle.timestamp))
                 .limit(num_points)
             )
-            results = await session.execute(statement)
-            candles = results.scalars().all()
+            count_result = await session.execute(stmt_count)
+            existing_candles = count_result.scalars().all()
 
-            # Sort back to chronological order
-            candles = sorted(candles, key=lambda c: c.timestamp)
+        now = datetime.now(timezone.utc)
+        interval_seconds = self._parse_resolution_to_seconds(resolution)
+        if max_age_seconds is None:
+            max_age_seconds = interval_seconds * 2
 
-        # 2. Check Freshness
-        is_stale = False
-        is_missing = len(candles) < num_points
+        should_fetch_full = False
+        should_fetch_delta = False
 
-        if not is_missing and candles:
-            last_candle_time = candles[-1].timestamp
-            # Ensure last_candle_time is timezone-aware (UTC)
-            if last_candle_time.tzinfo is None:
-                last_candle_time = last_candle_time.replace(tzinfo=timezone.utc)
+        if not latest_candle:
+            # Case 1: No data at all
+            should_fetch_full = True
+        else:
+            last_time = latest_candle.timestamp.replace(tzinfo=timezone.utc)
+            age = (now - last_time).total_seconds()
 
-            now = datetime.now(timezone.utc)
+            if age > max_age_seconds:
+                # Case 2: Data exists but is stale (gap at the end)
+                should_fetch_delta = True
+                delta_start = last_time.strftime("%Y-%m-%dT%H:%M:%S")
+                # Add slight buffer to end date (IG API handles 'now' implicitly if end is future,
+                # but safer to specify or let it infer. IG Range requires both usually.)
+                # We'll use Now + 1 minute to be safe
+                delta_end = (now + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
 
-            # Determine max age allowed
-            if max_age_seconds is None:
-                # Default: Stale if older than 2x resolution (heuristic)
-                # Parse resolution (e.g., "MIN" -> 60s)
-                interval = self._parse_resolution_to_seconds(resolution)
-                max_age_seconds = interval * 2
+            elif len(existing_candles) < num_points:
+                # Case 3: Data is fresh, but we don't have enough history (gap at the start)
+                # To be safe/simple, we trigger a full fetch here to backfill.
+                # Calculating exact backfill range is complex due to market hours.
+                should_fetch_full = True
 
-            if (now - last_candle_time).total_seconds() > max_age_seconds:
-                is_stale = True
-                logger.info(
-                    f"Data Stale: Last candle {last_candle_time} is > {max_age_seconds}s old."
-                )
-
-        # 3. Fetch from API if needed
-        if is_missing or is_stale:
+        # 2. Execute Fetch
+        if should_fetch_full:
             logger.info(
-                f"Fetching fresh data for {epic} (Missing: {is_missing}, Stale: {is_stale})..."
+                f"Full fetch triggered for {epic} (Missing/Insufficient history)"
             )
-
-            # Use collector to fetch & save
-            # We fetch 'num_points' to be safe, or we could calculate delta
             await self.collector.collect_market_data(epic, resolution, num_points)
 
-            # Re-query DB
-            async with async_session_maker() as session:
-                results = await session.execute(statement)
-                candles = results.scalars().all()
-                candles = sorted(candles, key=lambda c: c.timestamp)
+        elif should_fetch_delta:
+            logger.info(f"Delta fetch triggered for {epic} (Updating from {last_time})")
+            await self.collector.collect_market_data_range(
+                epic, resolution, start_date=delta_start, end_date=delta_end
+            )
 
-        return candles
+        # 3. Return Final Result
+        async with async_session_maker() as session:
+            final_stmt = (
+                select(HistoricalCandle)
+                .where(
+                    HistoricalCandle.symbol == epic,
+                    HistoricalCandle.resolution == resolution,
+                )
+                .order_by(desc(HistoricalCandle.timestamp))
+                .limit(num_points)
+            )
+            results = await session.execute(final_stmt)
+            candles = results.scalars().all()
+
+        return sorted(candles, key=lambda c: c.timestamp)
 
     def _parse_resolution_to_seconds(self, resolution: str) -> int:
         mapping = {
             "MIN": 60,
-            "MIN_1": 60,
+            "1Min": 60,
             "MIN_5": 300,
+            "5Min": 300,
             "MIN_15": 900,
+            "15Min": 900,
             "H": 3600,
+            "1H": 3600,
             "D": 86400,
+            "1D": 86400,
         }
         return mapping.get(resolution, 60)

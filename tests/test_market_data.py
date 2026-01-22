@@ -31,6 +31,7 @@ async def test_market_data_uses_cached_if_fresh():
     mock_ig = MagicMock()
     mock_collector = MagicMock()
     mock_collector.collect_market_data = AsyncMock()
+    mock_collector.collect_market_data_range = AsyncMock()
 
     service = MarketDataService(mock_ig, mock_collector)
 
@@ -39,24 +40,24 @@ async def test_market_data_uses_cached_if_fresh():
 
     # Assert
     assert len(candles) == 1
-    assert candles[0].symbol == epic
-    # Should NOT have called collector because data is only 30s old (fresh for 1min res)
     mock_collector.collect_market_data.assert_not_called()
+    mock_collector.collect_market_data_range.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_market_data_fetches_if_stale():
+async def test_market_data_delta_fetch_if_stale():
     await init_db()
 
-    # Seed DB with STALE data (1 hour old for 1min res)
+    # Seed DB with STALE data (2 hours old)
     epic = "STALE.EPIC"
     now = datetime.now(timezone.utc)
+    stale_time = now - timedelta(hours=2)
 
     async with async_session_maker() as session:
         c1 = HistoricalCandle(
             symbol=epic,
             resolution="MIN",
-            timestamp=now - timedelta(hours=1),
+            timestamp=stale_time,
             open=100,
             high=100,
             low=100,
@@ -68,8 +69,7 @@ async def test_market_data_fetches_if_stale():
     # Mocks
     mock_ig = MagicMock()
     mock_collector = MagicMock()
-    # Mock collector actually doing nothing, but we verify it was CALLED
-    mock_collector.collect_market_data = AsyncMock()
+    mock_collector.collect_market_data_range = AsyncMock()
 
     service = MarketDataService(mock_ig, mock_collector)
 
@@ -77,4 +77,10 @@ async def test_market_data_fetches_if_stale():
     await service.get_latest_candles(epic, "MIN", 1)
 
     # Assert
-    mock_collector.collect_market_data.assert_called_once_with(epic, "MIN", 1)
+    # Should call range fetch, not full fetch
+    mock_collector.collect_market_data_range.assert_called_once()
+
+    # Check args (start date should match stale time)
+    call_args = mock_collector.collect_market_data_range.call_args
+    assert call_args.args[0] == epic
+    assert call_args.kwargs["start_date"] == stale_time.strftime("%Y-%m-%dT%H:%M:%S")

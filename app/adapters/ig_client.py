@@ -168,6 +168,40 @@ class AsyncIGClient:
             logger.error(f"Failed to fetch prices for {epic}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+    )
+    async def fetch_historical_prices_by_range(
+        self,
+        epic: str,
+        resolution: str,
+        start_date: str,
+        end_date: str,
+        env_type: str = "LIVE",
+    ) -> Dict[str, Any]:
+        """
+        Fetches historical prices for a given range.
+        Dates should be in format: 'YYYY-MM-DDT00:00:00'
+        """
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+
+        # URL format for date range: /prices/{epic}/{resolution}/{startDate}/{endDate}
+        url = f"/prices/{epic}/{resolution}/{start_date}/{end_date}"
+        headers = {"VERSION": "3"}
+
+        try:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch prices range for {epic}: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
+
     async def create_order(
         self,
         epic: str,
