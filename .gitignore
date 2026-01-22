@@ -56,3 +56,6 @@ node_modules/
 npm-debug.log
 yarn-error.log
 package-lock.json # Optional: Some prefer to commit this, usually yes for apps.
+
+# Local Temp Files
+commit_msg.txt

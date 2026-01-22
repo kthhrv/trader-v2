@@ -6,6 +6,7 @@ from app.database.models import TradeExecution
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService
 from app.adapters.news_client import NewsClient
+from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
 
 
@@ -166,8 +167,21 @@ async def fetch_news_print(market_key: str):
         query = "FTSE 100 UK Economy"
     elif "SPX" in epic:
         query = "S&P 500 US Economy"
-    # ... (Abbreviated for CLI print - keeping it simple for now)
 
     print(f"Fetching news for {market_key}...")
     summary = await news_client.fetch_news(query, market=market_key)
     print(summary)
+
+
+async def run_test_alert():
+    """
+    Sends a test notification to Home Assistant.
+    """
+    logger.info("Sending Test Alert to HA...")
+    notifier = HomeAssistantNotifier()
+    await notifier.send_notification(
+        title="TRADER V2 Test",
+        message="This is a test notification from the V2 system.",
+        priority="high",
+    )
+    logger.info("Test Alert Sent.")

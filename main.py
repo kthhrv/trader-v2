@@ -1,7 +1,7 @@
 import asyncio
 import sys
 import argparse
-from app.core.logger import logger, configure_logging
+from app.core.logger import logger, configure_logging, enable_notification_handler
 from app.database.session import init_db
 from app.core.markets import MARKET_CONFIGS
 from app.cli.trade import run_market_strategy
@@ -11,6 +11,7 @@ from app.cli.diagnostics import (
     run_news_check,
     run_debug_search,
     fetch_news_print,
+    run_test_alert,
 )
 
 
@@ -60,6 +61,11 @@ async def main():
         action="store_true",
         help="Enable verbose logging (INFO level)",
     )
+    parser.add_argument(
+        "--test-alert",
+        action="store_true",
+        help="Send a test notification to Home Assistant",
+    )
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -71,15 +77,20 @@ async def main():
     # 0. Configure Logging
     configure_logging(args.verbose)
 
+    # Enable HA Notifications (Critical Alerts)
+    enable_notification_handler()
+
     # 1. Init DB (Auto-heal)
     if not args.debug_search:
         await init_db()
 
     # 2. Dispatch Commands
     if args.scheduler:
-        # Scheduler usually needs logs, so maybe force verbose if logic demands,
-        # but user can control it.
         await run_scheduler(args.dry_run)
+        return
+
+    if args.test_alert:
+        await run_test_alert()
         return
 
     if args.post_mortem:

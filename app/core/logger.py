@@ -1,4 +1,5 @@
 import sys
+import asyncio
 from loguru import logger
 from app.core.config import settings
 
@@ -22,16 +23,6 @@ def configure_logging(verbose: bool = False):
     Default: WARNING (Quiet)
     Verbose: INFO
     """
-    # Remove existing console handlers (if any) to avoid duplicates if called multiple times
-    # Note: loguru doesn't easily identify handlers by sink, so we rely on this being called once
-    # or we just add a new one. But since we removed all at top level, we just need to add the console one here.
-    # However, this module is imported at startup.
-    # To be safe, we can remove the sink `sys.stderr` if it exists, but loguru API is tricky there.
-    # Simpler: The module level `logger.add` for console should be removed, and ONLY added via this function.
-
-    # We'll rely on the top-level remove() having cleared everything, and the file handler being added.
-    # We just need to add the console handler.
-
     level = "INFO" if verbose else "WARNING"
 
     logger.add(
@@ -39,6 +30,44 @@ def configure_logging(verbose: bool = False):
         level=level,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     )
+
+
+def enable_notification_handler():
+    """
+    Adds a Loguru sink that forwards ERROR/CRITICAL logs to Home Assistant.
+    Uses fire-and-forget async task creation.
+    """
+    # Import inside function to avoid circular imports if any
+    from app.adapters.notification import HomeAssistantNotifier
+
+    notifier = HomeAssistantNotifier()
+    if not notifier.token:
+        logger.warning("Home Assistant token missing. Notifications disabled.")
+        return
+
+    async def _send_alert(title, msg):
+        await notifier.send_notification(title, msg, priority="high")
+
+    def ha_sink(message):
+        record = message.record
+        if record["level"].name in ["ERROR", "CRITICAL"]:
+            title = f"TRADER V2: {record['level'].name}"
+            msg = record["message"]
+            # Truncate
+            if len(msg) > 200:
+                msg = msg[:200] + "..."
+
+            try:
+                # Fire and forget if loop exists
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(_send_alert(title, msg))
+            except RuntimeError:
+                # No running loop (e.g. script ending)
+                pass
+
+    logger.add(ha_sink, level="ERROR")
+    logger.info("Home Assistant Notification Handler Enabled.")
 
 
 def get_logger():
