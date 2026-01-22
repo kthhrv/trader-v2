@@ -70,7 +70,7 @@ class GeminiService:
     Uses structured outputs and thinking (Reasoning) models.
     """
 
-    def __init__(self, model_name: str = "gemini-2.0-flash-thinking-exp-01-21"):
+    def __init__(self, model_name: str = "gemini-3-flash-preview"):
         self.model_name = model_name
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY.get_secret_value())
 
@@ -95,6 +95,7 @@ class GeminiService:
                     response_schema=response_model,
                     thinking_config=types.ThinkingConfig(
                         include_thoughts=True,
+                        thinking_level=types.ThinkingLevel.HIGH,
                     ),
                 ),
             )
