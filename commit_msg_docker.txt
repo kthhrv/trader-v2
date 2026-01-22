@@ -1,8 +1,0 @@
-feat: port docker infra and aliveness check
-
-- Add `Dockerfile` for V2 (multi-stage, uv, nodejs support).
-- Add `watchdog.py` for heartbeat monitoring and alerts.
-- Update `app/cli/schedule.py` to write `data/heartbeat.txt` every minute.
-- Add `docker-compose.yml` for orchestrating trader and watchdog.
-- Port `tasks.py`: rename `deploy` to `publish` (build & push), move `countdown` logic to CLI (`main.py --countdown`).
-- Add `invoke` and `pytz` dependencies.

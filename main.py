@@ -13,6 +13,7 @@ from app.cli.diagnostics import (
     fetch_news_print,
     run_test_alert,
     run_countdown,
+    run_recent_trades,
 )
 
 
@@ -73,6 +74,13 @@ async def main():
         help="Show time remaining until next market open",
     )
     parser.add_argument(
+        "--recent-trades",
+        type=int,
+        nargs="?",
+        const=5,
+        help="Show N recent trades (default 5)",
+    )
+    parser.add_argument(
         "--test-trade",
         action="store_true",
         help="Execute an immediate test trade (BUY/SELL). Requires --market.",
@@ -113,6 +121,10 @@ async def main():
 
     if args.countdown:
         await run_countdown()
+        return
+
+    if args.recent_trades is not None:
+        await run_recent_trades(args.recent_trades)
         return
 
     if args.test_trade:

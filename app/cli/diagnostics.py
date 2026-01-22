@@ -142,6 +142,132 @@ async def run_news_check(with_rating: bool, market_key: Optional[str] = None):
     print(f"\nSummary: {passed} Passed, {failed} Failed.")
 
 
+async def run_recent_trades(limit: int = 5):
+    """
+    Fetches and displays recent trades with detailed "awesome" formatting.
+    """
+    import shutil
+    from app.database.queries import get_recent_trades_joined
+
+    trades = await get_recent_trades_joined(limit)
+
+    if not trades:
+        print("No recent trades found.")
+        return
+
+    term_width = shutil.get_terminal_size((80, 20)).columns
+    # Ensure a reasonable minimum/maximum if needed, but term_width is usually safe.
+    # We'll use min(term_width, 100) to avoid excessive spanning on ultra-wide monitors,
+    # but stick to term_width for standard terminals.
+    # Actually, full width is fine for separators.
+
+    sep = "=" * term_width
+    sub_sep = (
+        "-" * 40
+    )  # Keep partial separators fixed or relative? Fixed is safer for data columns.
+
+    print(f"\n{sep}")
+    print(f"{'RECENT TRADES PERFORMANCE':^{term_width}}")
+    print(f"{sep}\n")
+
+    total_pnl = 0.0
+    wins = 0
+    losses = 0
+
+    for execution, signal in trades:
+        # ... (rest of loop)
+
+        # Colors
+        GREEN = "\033[92m"
+        RED = "\033[91m"
+        YELLOW = "\033[93m"
+        BLUE = "\033[94m"
+        RESET = "\033[0m"
+        BOLD = "\033[1m"
+
+        # Determine Outcome Color
+        pnl = execution.pnl if execution.pnl is not None else 0.0
+        pnl_color = GREEN if pnl > 0 else (RED if pnl < 0 else YELLOW)
+        outcome_str = f"{pnl_color}{execution.outcome_status}{RESET}"
+        pnl_str = f"{pnl_color}£{pnl:.2f}{RESET}"
+
+        # Stats
+        if execution.outcome_status == "WIN":
+            wins += 1
+            total_pnl += pnl
+        elif execution.outcome_status == "LOSS":
+            losses += 1
+            total_pnl += pnl
+
+        # Duration
+        duration_str = "Active"
+        if execution.fill_time and execution.exit_time:
+            duration = execution.exit_time - execution.fill_time
+            # Format nicely (HH:MM:SS)
+            total_seconds = int(duration.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+            duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        # R-Multiple (approximate)
+        r_multiple = "N/A"
+        if execution.initial_stop_loss and execution.fill_price:
+            risk = abs(execution.fill_price - execution.initial_stop_loss)
+            if risk > 0 and pnl != 0:
+                try:
+                    r_val = pnl / (risk * execution.size)
+                    r_multiple = f"{r_val:.1f}R"
+                except Exception:
+                    pass
+
+        # Strategy Name
+        strategy = signal.strategy_name if signal else "MANUAL/UNKNOWN"
+        symbol = signal.symbol if signal else "UNKNOWN"
+        reasoning = (
+            signal.reasoning[:120] + "..."
+            if signal and signal.reasoning
+            else "No reasoning recorded."
+        )
+
+        # Action Arrow
+        arrow = "⬆" if execution.direction == "BUY" else "⬇"
+        dir_color = GREEN if execution.direction == "BUY" else RED
+
+        print(
+            f"{BOLD}Deal ID:{RESET} {execution.deal_id} | {dir_color}{arrow} {execution.direction}{RESET} {symbol} ({strategy})"
+        )
+        print(
+            f"Time: {execution.fill_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | Duration: {duration_str}"
+        )
+        print(f"{sub_sep}")
+        print(
+            f"Entry: {execution.fill_price}  ->  Exit: {execution.exit_price or 'Active'}"
+        )
+        print(
+            f"Size:  {execution.size}      |  Result: {outcome_str} ({pnl_str}) [{r_multiple}]"
+        )
+        print(
+            f"Stops: {execution.initial_stop_loss} (Init) -> {execution.current_stop_loss} (Final)"
+        )
+        if signal:
+            print(
+                f"Plan:  Target {signal.take_profit or 'Open'} | Conf: {signal.confidence}"
+            )
+            print(f"{BLUE}AI Reasoning:{RESET} {reasoning}")
+        print(f"{'_' * term_width}\n")
+
+    # Summary Footer
+    win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
+    tot_color = GREEN if total_pnl > 0 else (RED if total_pnl < 0 else RESET)
+
+    print(f"SUMMARY (Last {limit})")
+    print(
+        f"Total PnL: {tot_color}£{total_pnl:.2f}{RESET} | Win Rate: {win_rate:.1f}% ({wins}W-{losses}L)"
+    )
+    print(f"{'=' * term_width}\n")
+
+
 async def run_debug_search(term: str):
     """
     Searches for markets in IG.
