@@ -12,6 +12,7 @@ from app.cli.diagnostics import (
     run_debug_search,
     fetch_news_print,
     run_test_alert,
+    run_countdown,
 )
 
 
@@ -67,6 +68,11 @@ async def main():
         help="Send a test notification to Home Assistant",
     )
     parser.add_argument(
+        "--countdown",
+        action="store_true",
+        help="Show time remaining until next market open",
+    )
+    parser.add_argument(
         "--test-trade",
         action="store_true",
         help="Execute an immediate test trade (BUY/SELL). Requires --market.",
@@ -103,6 +109,10 @@ async def main():
 
     if args.test_alert:
         await run_test_alert()
+        return
+
+    if args.countdown:
+        await run_countdown()
         return
 
     if args.test_trade:

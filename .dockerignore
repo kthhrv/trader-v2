@@ -1,0 +1,31 @@
+# Local environment
+.venv
+node_modules
+__pycache__
+*.pyc
+
+# Data and logs
+data/*.db
+logs/*.log
+
+# Tests and Coverage
+tests/
+.coverage
+.pytest_cache
+
+# Version control
+.git
+.gitignore
+
+# Project specific
+.env
+.env.*
+!.env.example
+.ruff_cache
+.python-version
+.pre-commit-config.yaml
+README.md
+Dockerfile
+docker-compose.yml
+tasks.py
+commit_msg_*.txt

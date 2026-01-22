@@ -1,7 +1,7 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from sqlmodel import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.database import session as db_session
 from app.database.session import init_db
@@ -129,8 +129,24 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         analyst_mode=False,
     )
 
-    # 3. Run Strategy
-    await engine.run_strategy("london")
+    # Mock datetime to simulate passage of time for throttling
+    # We need an infinite source of increasing time because the stream restarts
+    # and has multiple ticks.
+    import itertools
+
+    initial_time = datetime.now(timezone.utc).timestamp()
+
+    # Increment by 10s every call to ensure > 5s throttle is always passed
+    time_gen = itertools.count(start=initial_time, step=10.0)
+
+    # We need to mock datetime within app.services.executor
+    with patch("app.services.executor.datetime") as mock_datetime:
+        # Mock now().timestamp()
+        mock_datetime.now.return_value.timestamp.side_effect = time_gen
+        mock_datetime.now.return_value.tzinfo = timezone.utc  # Keep tz info
+
+        # Run Strategy
+        await engine.run_strategy("london")
 
     # 4. Verification
     async with db_session.async_session_maker() as session:

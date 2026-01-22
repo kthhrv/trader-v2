@@ -140,9 +140,9 @@ class MarketAnalyzer:
         """
 
         if regime.candles_5m:
-            context += f"\\n\\n--- 5-Minute Structure (Last 5) ---\\n{fmt_candles(regime.candles_5m, 5)}"
+            context += f"\\n\\n--- 5-Minute Structure (Last 2 Hours) ---\\n{fmt_candles(regime.candles_5m, 24)}"
         if regime.candles_1m:
-            context += f"\\n\\n--- 1-Minute Timing (Last 5) ---\\n{fmt_candles(regime.candles_1m, 5)}"
+            context += f"\\n\\n--- 1-Minute Timing (Last 15 Mins) ---\\n{fmt_candles(regime.candles_1m, 15)}"
         if regime.candles_daily:
             lines = ["Date | Open | High | Low | Close"]
             for c in regime.candles_daily[-5:]:

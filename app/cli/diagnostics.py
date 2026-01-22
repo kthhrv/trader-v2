@@ -185,3 +185,54 @@ async def run_test_alert():
         priority="high",
     )
     logger.info("Test Alert Sent.")
+
+
+async def run_countdown():
+    """
+    Shows time remaining until the next market open.
+    """
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    now_utc = datetime.now(ZoneInfo("UTC"))
+    next_opens = []
+
+    for name, cfg in MARKET_CONFIGS.items():
+        schedule = cfg.get("schedule")
+        if not schedule:
+            continue
+
+        tz = ZoneInfo(cfg.get("timezone", "UTC"))
+        now_tz = now_utc.astimezone(tz)
+
+        # Calculate next occurrence of this time
+        target = now_tz.replace(
+            hour=schedule["hour"], minute=schedule["minute"], second=0, microsecond=0
+        )
+
+        # If it's already passed today, or it's a weekend, find the next Mon-Fri open
+        if now_tz >= target or now_tz.weekday() >= 5:  # 5=Sat, 6=Sun
+            days_to_add = 1
+            while True:
+                candidate = target + timedelta(days=days_to_add)
+                if candidate.weekday() < 5 and candidate > now_tz:
+                    target = candidate
+                    break
+                days_to_add += 1
+
+        next_opens.append((name, target.astimezone(ZoneInfo("UTC"))))
+
+    next_opens.sort(key=lambda x: x[1])
+
+    if next_opens:
+        next_market, next_time = next_opens[0]
+        remaining = next_time - now_utc
+
+        # Clean up the string representation
+        rem_str = str(remaining).split(".")[0]
+
+        print(f"\nNext Open: {next_market.upper()}")
+        print(f"Time:      {next_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"Countdown: T-{rem_str}\n")
+    else:
+        print("No market opens scheduled.")

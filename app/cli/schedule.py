@@ -1,9 +1,23 @@
 import asyncio
+import os
+from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.core.logger import logger
 from app.core.markets import MARKET_CONFIGS
 from app.cli.trade import run_market_strategy
+
+
+def update_heartbeat():
+    """
+    Updates the heartbeat file to indicate the system is alive.
+    """
+    try:
+        os.makedirs("data", exist_ok=True)
+        with open("data/heartbeat.txt", "w") as f:
+            f.write(datetime.now().isoformat())
+    except Exception as e:
+        logger.error(f"Failed to update heartbeat: {e}")
 
 
 async def run_scheduler(dry_run: bool):
@@ -12,6 +26,9 @@ async def run_scheduler(dry_run: bool):
     """
     logger.info("Starting Scheduler Mode...")
     scheduler = AsyncIOScheduler()
+
+    # Heartbeat job
+    scheduler.add_job(update_heartbeat, "interval", minutes=1, id="heartbeat")
 
     for market_key, config in MARKET_CONFIGS.items():
         schedule = config.get("schedule")

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trader-v2
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    env_file:
+      - .env
+
+  watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trader-v2-watchdog
+    restart: unless-stopped
+    command: ["uv", "run", "python", "watchdog.py"]
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    env_file:
+      - .env
+    depends_on:
+      - trader

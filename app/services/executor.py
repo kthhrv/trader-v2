@@ -155,6 +155,7 @@ class TradeExecutor:
         timeout = 7200
         start_time = datetime.now(timezone.utc).timestamp()
         last_check_time = start_time
+        last_trailing_check = 0.0
 
         async for update in self.streamer.stream(epic):
             now = datetime.now(timezone.utc).timestamp()
@@ -175,6 +176,11 @@ class TradeExecutor:
                 offer = update.get("offer")
                 if not bid or not offer:
                     continue
+
+                # Throttle Trailing Stop Logic (Every 5s)
+                if (now - last_trailing_check) < 5.0:
+                    continue
+                last_trailing_check = now
 
                 current_price = bid if direction == "BUY" else offer
 
