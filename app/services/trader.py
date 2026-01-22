@@ -39,20 +39,52 @@ class StrategyEngine:
     async def run_strategy(self, market_key: str):
         """
         Executes the 'Market Open' strategy for a specific market.
+        Orchestrates generation, validation, and execution.
+        """
+        # 1. Generate Signal
+        signal, signal_db = await self.generate_trade_signal(market_key)
+
+        if not signal:
+            return
+
+        if self.analyst_mode:
+            logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
+            return
+
+        if signal.action == Action.WAIT:
+            return
+
+        # 2. Validate Signal (Risk Check)
+        if not await self.validate_signal(signal):
+            logger.warning("Signal failed validation. Aborting.")
+            return
+
+        # 3. Execute
+        config = MARKET_CONFIGS.get(market_key)
+        if config:
+            await self.execute_trade_plan(
+                signal, config["epic"], signal_db.id if signal_db else None
+            )
+
+    async def generate_trade_signal(
+        self, market_key: str
+    ) -> tuple[Optional[TradingSignal], Optional[TradeSignal]]:
+        """
+        Analyzes the market and returns a Trading Signal + DB Record.
         """
         config = MARKET_CONFIGS.get(market_key)
         if not config:
             logger.error(f"Invalid market key: {market_key}")
-            return
+            return None, None
 
         epic = config["epic"]
-        logger.info(f"Starting Strategy Run for {config['name']} ({epic})...")
+        logger.info(f"Generating Signal for {config['name']} ({epic})...")
 
         # 1. Build Market Regime (Technical Analysis)
         regime = await self._build_market_regime(epic)
         if not regime:
             logger.error("Failed to build market regime. Aborting.")
-            return
+            return None, None
 
         # 2. Fetch News
         news_query = self._get_news_query(epic)
@@ -67,22 +99,126 @@ class StrategyEngine:
 
         if not signal:
             logger.error("AI returned no signal.")
-            return
+            return None, None
 
         logger.info(f"AI Decision: {signal.action} | Conf: {signal.confidence}")
 
         # Save Signal to DB
         signal_db = await self._save_signal(signal, config["name"])
 
-        if self.analyst_mode:
-            logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
-            return
+        return signal, signal_db
 
+    async def validate_signal(self, signal: TradingSignal) -> bool:
+        """
+        Validates the signal against risk management rules.
+        """
         if signal.action == Action.WAIT:
+            return True
+
+        # Fetch Account Balance
+        try:
+            balance = await self.ig_client.get_account_balance(
+                settings.TRADING_ACCOUNT_ENV
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch balance for validation: {e}")
+            return False  # Fail safe
+
+        # Calculate Risk Rules
+        # Risk per Trade = Balance * RISK_PER_TRADE_PERCENT
+        max_risk_amount = balance * settings.RISK_PER_TRADE_PERCENT
+
+        # Trade Risk = Size * Distance
+        # Distance = |Entry - Stop|
+        distance = abs(signal.entry - signal.stop_loss)
+        if distance == 0:
+            logger.error("Invalid Stop Loss: Distance is 0")
+            return False
+
+        trade_risk = signal.size * distance
+
+        logger.info(
+            f"Validation: Balance={balance:.2f}, MaxRisk={max_risk_amount:.2f}, TradeRisk={trade_risk:.2f}"
+        )
+
+        if trade_risk > max_risk_amount:
+            logger.warning(
+                f"Risk Violation: Trade Risk ({trade_risk:.2f}) > Max Risk ({max_risk_amount:.2f})"
+            )
+
+            # Auto-adjust size?
+            # new_size = max_risk_amount / distance
+            # round down to 1 decimal place? Or IG min size?
+            # For safety, let's reject or clamp.
+
+            new_size = round(max_risk_amount / distance, 2)
+            if new_size < 0.5:  # Assuming min bet 0.5?
+                logger.error(f"Calculated size {new_size} below minimum. rejecting.")
+                return False
+
+            logger.info(f"Adjusting Size: {signal.size} -> {new_size}")
+            signal.size = new_size  # Mutate signal
+
+        return True
+
+    async def execute_trade_plan(
+        self, signal: TradingSignal, epic: str, signal_id: Optional[int]
+    ):
+        """
+        Executes the trade via IG Client.
+        Waits for price trigger if entry type is INSTANT (Market if Touched).
+        """
+        if self.dry_run:
+            logger.info("DRY RUN: Trade simulation successful.")
             return
 
-        # 5. Execute (if not WAIT)
-        await self._execute_signal(signal, epic, signal_db.id)
+        direction = "BUY" if signal.action == Action.BUY else "SELL"
+
+        # 1. Wait for Entry Trigger
+        logger.info(f"Waiting for trigger: {direction} @ {signal.entry}...")
+        triggered_price = await self._wait_for_trigger(epic, direction, signal.entry)
+
+        if not triggered_price:
+            logger.warning("Trigger timeout or cancellation. Trade aborted.")
+            return
+
+        logger.info(f"Triggered at {triggered_price}! Executing {direction}...")
+
+        try:
+            # 2. Place Order
+            response = await self.ig_client.create_order(
+                epic=epic,
+                direction=direction,
+                size=signal.size,
+                stop_level=signal.stop_loss,
+                limit_level=signal.take_profit,
+                env_type=settings.TRADING_ACCOUNT_ENV,
+            )
+            logger.info(f"Order Placed: {response}")
+
+            if "dealReference" in response:
+                deal_ref = response["dealReference"]
+                deal_id = response.get("dealId", deal_ref)
+
+                await self._save_execution(
+                    signal_id=signal_id,
+                    deal_id=deal_id,
+                    direction=direction,
+                    fill_price=response.get("level", triggered_price),
+                    size=signal.size,
+                    stop_loss=signal.stop_loss,
+                )
+
+                if signal.use_trailing_stop:
+                    await self._monitor_position(
+                        deal_id, epic, direction, signal.stop_loss, signal.atr
+                    )
+
+        except Exception as e:
+            logger.error(f"Execution Failed: {e}")
+
+    # ... Helper methods (_wait_for_trigger, _monitor_position, _save_signal, etc) remain same ...
+    # Need to include them in the file write
 
     def _get_news_query(self, epic: str) -> str:
         if "FTSE" in epic:
@@ -105,9 +241,6 @@ class StrategyEngine:
             return "Global Financial Markets"
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
-        """
-        Fetches data and calculates indicators to form the Market Regime.
-        """
         # Fetch 15m data for indicators (50 points)
         candles_15m = await self.market_data.get_latest_candles(epic, "MINUTE_15", 50)
 
@@ -194,62 +327,6 @@ class StrategyEngine:
         {news}
         """
 
-    async def _execute_signal(
-        self, signal: TradingSignal, epic: str, signal_id: Optional[int]
-    ):
-        """
-        Executes the trade via IG Client.
-        Waits for price trigger if entry type is INSTANT (Market if Touched).
-        """
-        if self.dry_run:
-            logger.info("DRY RUN: Trade simulation successful.")
-            return
-
-        direction = "BUY" if signal.action == Action.BUY else "SELL"
-
-        # 1. Wait for Entry Trigger
-        logger.info(f"Waiting for trigger: {direction} @ {signal.entry}...")
-        triggered_price = await self._wait_for_trigger(epic, direction, signal.entry)
-
-        if not triggered_price:
-            logger.warning("Trigger timeout or cancellation. Trade aborted.")
-            return
-
-        logger.info(f"Triggered at {triggered_price}! Executing {direction}...")
-
-        try:
-            # 2. Place Order
-            response = await self.ig_client.create_order(
-                epic=epic,
-                direction=direction,
-                size=signal.size,
-                stop_level=signal.stop_loss,
-                limit_level=signal.take_profit,
-                env_type=settings.TRADING_ACCOUNT_ENV,
-            )
-            logger.info(f"Order Placed: {response}")
-
-            if "dealReference" in response:
-                deal_ref = response["dealReference"]
-                deal_id = response.get("dealId", deal_ref)
-
-                await self._save_execution(
-                    signal_id=signal_id,
-                    deal_id=deal_id,
-                    direction=direction,
-                    fill_price=response.get("level", triggered_price),
-                    size=signal.size,
-                    stop_loss=signal.stop_loss,
-                )
-
-                if signal.use_trailing_stop:
-                    await self._monitor_position(
-                        deal_id, epic, direction, signal.stop_loss, signal.atr
-                    )
-
-        except Exception as e:
-            logger.error(f"Execution Failed: {e}")
-
     async def _wait_for_trigger(
         self, epic: str, direction: str, target_entry: float
     ) -> Optional[float]:
@@ -273,13 +350,9 @@ class StrategyEngine:
 
                 # Check Trigger
                 if direction == "BUY":
-                    # Buy if Offer drops to target (Limit entry) or breaks above (Stop entry)?
-                    # "Market if Touched" usually means if price reaches level.
-                    # For a breakout BUY, we usually wait for price to go UP to the entry.
                     if offer >= target_entry:
                         return offer
                 elif direction == "SELL":
-                    # For breakout SELL, wait for price to go DOWN to entry.
                     if bid <= target_entry:
                         return bid
         return None
@@ -316,25 +389,15 @@ class StrategyEngine:
 
                 # Logic for BUY
                 if direction == "BUY":
-                    # Current price for exit logic is Bid
                     market_price = bid
-
-                    # Target Stop = Current Price - Trail Distance
                     target_stop = market_price - trail_distance
-
-                    # If target stop is significantly higher than current stop, Move it up.
                     if target_stop > (current_stop + step_size):
                         new_stop = round(target_stop, 1)
 
                 # Logic for SELL
                 elif direction == "SELL":
-                    # Current price for exit is Offer
                     market_price = offer
-
-                    # Target Stop = Current Price + Trail Distance
                     target_stop = market_price + trail_distance
-
-                    # If target stop is significantly lower than current stop, Move it down.
                     if target_stop < (current_stop - step_size):
                         new_stop = round(target_stop, 1)
 
@@ -343,14 +406,12 @@ class StrategyEngine:
                         f"Trailing Stop Trigger: Price {bid if direction == 'BUY' else offer} -> New Stop {new_stop}"
                     )
                     try:
-                        # Use settings.TRADING_ACCOUNT_ENV to determine correct account type
                         await self.ig_client.update_open_position(
                             deal_id,
                             stop_level=new_stop,
                             env_type=settings.TRADING_ACCOUNT_ENV,
                         )
                         current_stop = new_stop
-                        # Update DB
                         await self._update_execution_stop(deal_id, new_stop)
                     except Exception as e:
                         logger.error(f"Failed to update stop: {e}")

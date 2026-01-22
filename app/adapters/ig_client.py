@@ -225,6 +225,35 @@ class AsyncIGClient:
             logger.error(f"Search failed: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
+    async def get_account_balance(self, env_type: str = "DEMO") -> float:
+        """
+        Fetches the available cash balance for the account.
+        """
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "1"}
+
+        try:
+            response = await client.get("/accounts", headers=headers)
+            response.raise_for_status()
+            accounts = response.json().get("accounts", [])
+            # Usually only one account is returned or we pick the default
+            # Assuming the first one or looking for the current one if logic required
+            if not accounts:
+                logger.warning(f"No accounts found for {env_type}")
+                return 0.0
+
+            # Use 'balance' (cash) or 'available' (funds for trading)
+            # For risk calculation, 'balance' is safer basis, but 'available' is practical constraint.
+            # Using 'balance' for % risk rule.
+            return float(accounts[0].get("balance", 0.0))
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch account balance: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
     async def update_open_position(
         self,
         deal_id: str,

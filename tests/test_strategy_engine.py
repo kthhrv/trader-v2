@@ -10,6 +10,7 @@ from app.adapters.gemini_service import TradingSignal, Action
 def mock_deps():
     mock_ig = MagicMock()
     mock_ig.create_order = AsyncMock(return_value={"dealId": "TEST_DEAL"})
+    mock_ig.get_account_balance = AsyncMock(return_value=10000.0)
 
     mock_data = MagicMock()
     mock_analyst = MagicMock()
@@ -74,6 +75,20 @@ async def test_strategy_engine_run_buy(mock_deps, dummy_regime, monkeypatch):
     # Mock data fetching using monkeypatch
     mock_build = AsyncMock(return_value=dummy_regime)
     monkeypatch.setattr(engine, "_build_market_regime", mock_build)
+    # Monkeypatch internal signal generation to skip validation? No, validation relies on ig_client.
+    # We already mocked ig_client.get_account_balance.
+
+    # We need to mock generate_trade_signal if we want to bypass that part, but here we test run_strategy logic.
+    # Wait, run_strategy now orchestrates.
+    # It calls generate_trade_signal.
+    # Which calls _build_market_regime (mocked).
+
+    # We need to monkeypatch generate_trade_signal? No, we mocked its dependencies.
+    # But generate_trade_signal returns signal, db_signal.
+
+    # We need to make sure _save_signal is mocked or works.
+    mock_save = AsyncMock(return_value=MagicMock(id=123))
+    monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     await engine.run_strategy("london")
 
@@ -99,9 +114,12 @@ async def test_strategy_engine_wait_action(mock_deps, dummy_regime, monkeypatch)
         )
     )
 
+    mock_save = AsyncMock(return_value=MagicMock(id=123))
+
     engine = StrategyEngine(
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=False
     )
+    monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     mock_build = AsyncMock(return_value=dummy_regime)
     monkeypatch.setattr(engine, "_build_market_regime", mock_build)
@@ -130,17 +148,28 @@ async def test_strategy_engine_dry_run(mock_deps, dummy_regime, monkeypatch):
         )
     )
 
+    mock_save = AsyncMock(return_value=MagicMock(id=123))
+
     # Dry Run = True
     engine = StrategyEngine(
         mock_ig, mock_data, mock_analyst, mock_news, mock_streamer, dry_run=True
     )
+    monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     mock_build = AsyncMock(return_value=dummy_regime)
     monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 
+    # Mock stream to trigger
+    async def trigger_stream(epic):
+        yield {"type": "price_update", "bid": 6990, "offer": 7005}  # Trigger!
+
+    mock_streamer.stream = trigger_stream
+
     await engine.run_strategy("london")
 
-    # Should NOT call create_order despite SELL signal
+    # Should NOT call create_order despite SELL signal (it's inside _execute_signal logic, which checks dry_run)
+    # Wait, execute_trade_plan calls create_order?
+    # execute_trade_plan checks dry_run and returns early.
     mock_ig.create_order.assert_not_called()
 
 
@@ -150,7 +179,9 @@ async def test_strategy_engine_insufficient_data(mock_deps, monkeypatch):
 
     engine = StrategyEngine(mock_ig, mock_data, mock_analyst, mock_news, mock_streamer)
 
-    # Simulate data failure
+    # Simulate data failure (returns None)
+    # _build_market_regime returns None
+    # generate_trade_signal returns None, None
     mock_build = AsyncMock(return_value=None)
     monkeypatch.setattr(engine, "_build_market_regime", mock_build)
 

@@ -8,7 +8,7 @@ from app.core.logger import logger
 from app.database.session import init_db, async_session_maker
 from app.database.models import TradeExecution
 from app.adapters.ig_client import AsyncIGClient
-from app.adapters.gemini_service import GeminiService
+from app.adapters.gemini_service import GeminiService, Action
 from app.adapters.news_client import NewsClient
 from app.services.collector import CollectorService
 from app.services.market_data import MarketDataService
@@ -35,6 +35,7 @@ async def run_market_strategy(market_key: str, dry_run: bool):
             streamer=streamer,
             dry_run=dry_run,
         )
+        # Scheduler runs fully automated logic (Generate -> Validate -> Execute)
         await engine.run_strategy(market_key)
 
 
@@ -120,6 +121,9 @@ async def main():
         help="Start the background scheduler for all markets",
     )
     parser.add_argument("--debug-search", type=str, help="Search for markets (debug)")
+    parser.add_argument(
+        "--yes", action="store_true", help="Skip confirmation prompt for execution"
+    )
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -226,7 +230,7 @@ async def main():
         print(summary)
         return
 
-    # 6. Single Market Run
+    # 6. Single Market Run (Interactive)
     if not args.market:
         logger.error("Please specify --market, --scheduler, or --post-mortem")
         sys.exit(1)
@@ -249,7 +253,52 @@ async def main():
         )
 
         try:
-            await engine.run_strategy(args.market)
+            # 1. Generate Signal
+            signal, signal_db = await engine.generate_trade_signal(args.market)
+
+            if not signal:
+                logger.info("No signal generated.")
+                return
+
+            # Print Plan
+            print("\n" + "=" * 50)
+            print(f"TRADING PLAN: {signal.ticker}")
+            print("=" * 50)
+            print(f"Action: {signal.action}")
+            print(f"Entry: {signal.entry}")
+            print(f"Stop: {signal.stop_loss}")
+            print(f"Target: {signal.take_profit}")
+            print(f"Size: {signal.size}")
+            print(f"Reasoning: {signal.reasoning}")
+            print("-" * 50)
+
+            if args.analyst:
+                return
+
+            if signal.action == Action.WAIT:
+                logger.info("Signal is WAIT. Skipping execution.")
+                return
+
+            # 2. Confirm (if not --yes and not dry-run implicit?)
+            # Usually Dry Run also asks unless --yes
+            if not args.yes:
+                confirm = input("\nExecute this plan? [y/N]: ").strip().lower()
+                if confirm != "y":
+                    logger.info("Execution cancelled by user.")
+                    return
+
+            # 3. Validate
+            if not await engine.validate_signal(signal):
+                logger.error("Signal failed validation (Risk/Balance). Aborting.")
+                return
+
+            # 4. Execute
+            config = MARKET_CONFIGS.get(args.market)
+            if config:
+                await engine.execute_trade_plan(
+                    signal, config["epic"], signal_db.id if signal_db else None
+                )
+
         except Exception as e:
             logger.exception(f"Fatal error during execution: {e}")
 
