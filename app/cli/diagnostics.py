@@ -8,6 +8,15 @@ from app.adapters.gemini_service import GeminiService
 from app.adapters.news_client import NewsClient
 from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
+from app.services.scorecard import ScorecardService
+
+
+async def run_scorecard():
+    """
+    Generates and prints the Performance Scorecard.
+    """
+    stats = await ScorecardService.get_scorecard_data()
+    ScorecardService.generate_report(stats)
 
 
 async def run_post_mortem(deal_id: str):

@@ -14,6 +14,7 @@ from app.cli.diagnostics import (
     run_test_alert,
     run_countdown,
     run_recent_trades,
+    run_scorecard,
 )
 
 
@@ -36,6 +37,11 @@ async def main():
         "--news-check",
         action="store_true",
         help="Run a health check on news fetching for all markets.",
+    )
+    parser.add_argument(
+        "--scorecard",
+        action="store_true",
+        help="Show aggregated performance stats (Win Rate, Profit Factor, etc).",
     )
     parser.add_argument(
         "--with-rating",
@@ -113,6 +119,10 @@ async def main():
     # 2. Dispatch Commands
     if args.scheduler:
         await run_scheduler(args.dry_run)
+        return
+
+    if args.scorecard:
+        await run_scorecard()
         return
 
     if args.test_alert:
