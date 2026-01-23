@@ -19,3 +19,36 @@ def publish(c):
 
     print(f"Pushing {full_image_name}...")
     c.run(f"docker push {full_image_name}")
+
+
+@task
+def ui(c):
+    """
+    Start the Streamlit UI dashboard locally.
+    """
+    print("Starting Trader V2 Dashboard...")
+    c.run("streamlit run app/ui/app.py")
+
+
+@task
+def check(c):
+    """
+    Run all quality checks: linting, types, and tests.
+    """
+    print("--- Running Ruff Check ---")
+    c.run("ruff check .")
+
+    print("\n--- Running Type Check ---")
+    c.run("ty check")
+
+    print("\n--- Running Tests ---")
+    c.run("pytest")
+
+
+@task
+def seed(c):
+    """
+    Populate the database with sample data for UI demonstration.
+    """
+    print("Seeding database with demo data...")
+    c.run("PYTHONPATH=. uv run python app/database/seeder.py")

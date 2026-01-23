@@ -1,7 +1,26 @@
 from typing import List, Tuple
-from sqlmodel import select, desc
+from datetime import datetime
+from sqlmodel import select, desc, asc
 from app.database.session import async_session_maker
-from app.database.models import TradeSignal, TradeExecution
+from app.database.models import TradeSignal, TradeExecution, HistoricalCandle
+
+
+async def get_trade_candles(
+    symbol: str, start_time: datetime, end_time: datetime
+) -> List[HistoricalCandle]:
+    """
+    Fetches 1-minute candles for a specific trade window.
+    """
+    async with async_session_maker() as session:
+        statement = (
+            select(HistoricalCandle)
+            .where(HistoricalCandle.symbol == symbol)
+            .where(HistoricalCandle.timestamp >= start_time)
+            .where(HistoricalCandle.timestamp <= end_time)
+            .order_by(asc(HistoricalCandle.timestamp))
+        )
+        results = await session.execute(statement)
+        return results.scalars().all()
 
 
 async def get_recent_trades_joined(
