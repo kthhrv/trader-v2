@@ -24,7 +24,8 @@ async def test_wait_for_trigger_respects_spread(mock_deps):
 
     mock_streamer.stream = mock_stream_gen
 
-    executor = TradeExecutor(mock_client, mock_streamer)
+    mock_status = MagicMock()
+    executor = TradeExecutor(mock_client, mock_streamer, mock_status)
 
     # We want to BUY at 101.
     # Update 1: Offer 102 >= 101. BUT Spread 12 > 5. SKIP.

@@ -399,6 +399,42 @@ class AsyncIGClient:
             logger.error(f"Failed to fetch history: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
+    async def close_open_position(
+        self,
+        deal_id: str,
+        direction: str,
+        size: float,
+        env_type: str = "LIVE",
+    ) -> Dict[str, Any]:
+        """
+        Closes an open position.
+        Direction should be the OPPOSITE of the opening direction (or just use direction from position).
+        Actually IG API for closing OTC positions requires the closing direction.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+        headers = {"VERSION": "1", "_method": "DELETE"}
+        payload = {
+            "dealId": deal_id,
+            "direction": direction,
+            "size": size,
+            "orderType": "MARKET",
+        }
+
+        try:
+            # IG uses DELETE for closing OTC positions
+            response = await client.post(
+                "/positions/otc", json=payload, headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to close position {deal_id}: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
     async def fetch_deal_confirmation(
         self, deal_reference: str, env_type: str = "LIVE"
     ) -> Dict[str, Any]:

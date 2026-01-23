@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 from typing import Optional
 from sqlmodel import select
@@ -8,6 +8,7 @@ from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import TradingSignal, Action
 from app.services.streamer import StreamerService
+from app.services.market_status import MarketStatusService
 from app.database import session as db_session
 from app.database.models import TradeExecution
 
@@ -17,10 +18,12 @@ class TradeExecutor:
         self,
         ig_client: AsyncIGClient,
         streamer: StreamerService,
+        market_status: MarketStatusService,
         dry_run: bool = False,
     ):
         self.ig_client = ig_client
         self.streamer = streamer
+        self.market_status = market_status
         self.dry_run = dry_run
 
     async def execute_trade(
@@ -106,7 +109,13 @@ class TradeExecutor:
                 # Need entry price for Breakeven calculation
                 fill_price = float(response.get("level", triggered_price))
                 await self._monitor_position(
-                    deal_id, epic, direction, fill_price, signal.stop_loss, signal.atr
+                    deal_id,
+                    epic,
+                    direction,
+                    fill_price,
+                    signal.stop_loss,
+                    signal.atr,
+                    signal.size,
                 )
 
         except Exception as e:
@@ -156,10 +165,19 @@ class TradeExecutor:
         entry_price: float,
         current_stop: float,
         atr: float,
+        size: float,
     ):
         logger.info(
             f"Starting Monitor for Deal {deal_id} (Entry: {entry_price}, Stop: {current_stop}, ATR: {atr})..."
         )
+
+        # 0. Market Close Check Setup
+        market_close_dt = None
+        try:
+            market_close_dt = self.market_status.get_market_close_datetime(epic)
+            logger.info(f"Market Close time for {epic}: {market_close_dt}")
+        except Exception as e:
+            logger.warning(f"Could not determine market close time for {epic}: {e}")
 
         # Logic State
         moved_to_breakeven = False
@@ -172,13 +190,14 @@ class TradeExecutor:
         trail_distance = atr * 3.0
         step_size = atr * 0.1  # Min step to avoid spamming
 
-        timeout = 7200
+        timeout = 28800  # 8 hours for monitoring
         start_time = datetime.now(timezone.utc).timestamp()
         last_check_time = start_time
         last_trailing_check = 0.0
 
         async for update in self.streamer.stream(epic):
-            now = datetime.now(timezone.utc).timestamp()
+            now_dt = datetime.now(timezone.utc)
+            now = now_dt.timestamp()
             if (now - start_time) > timeout:
                 logger.info("Monitor timeout.")
                 break
@@ -190,6 +209,35 @@ class TradeExecutor:
                     logger.info(f"Position {deal_id} closed. Stopping monitor.")
                     await self._sync_outcome(deal_id)
                     break
+
+                # --- Market Close Time Check ---
+                if market_close_dt:
+                    # localized comparison
+                    now_localized = datetime.now(market_close_dt.tzinfo)
+                    time_to_close = market_close_dt - now_localized
+                    # If within 15 minutes (900 seconds) of close
+                    if timedelta(seconds=0) < time_to_close < timedelta(minutes=15):
+                        logger.warning(
+                            f"Market for {epic} closing in {time_to_close}. Forcing exit for {deal_id}."
+                        )
+                        try:
+                            # Close Direction is opposite of opening
+                            close_dir = "SELL" if direction == "BUY" else "BUY"
+                            await self.ig_client.close_open_position(
+                                deal_id,
+                                close_dir,
+                                size,
+                                env_type=settings.TRADING_ACCOUNT_ENV,
+                            )
+                            logger.info(
+                                f"Successfully force-closed {deal_id} before market close."
+                            )
+                            await self._sync_outcome(deal_id)
+                            break
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to force-close {deal_id} near close: {e}"
+                            )
 
             if update.get("type") == "price_update":
                 bid = update.get("bid")

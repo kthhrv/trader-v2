@@ -122,14 +122,17 @@ async def test_full_trading_flow_e2e_mocked_adapter():
 
     streamer.stream = mock_stream
 
-    # Instantiate Sub-Services
-    risk_manager = RiskManager(mock_ig)
-    market_analyzer = MarketAnalyzer(market_data, news_client, analyst)
-    trade_executor = TradeExecutor(mock_ig, streamer, dry_run=False)
-
     # Mock Market Status
     mock_status = MagicMock()
     mock_status.is_holiday.return_value = False
+    mock_status.get_market_close_datetime.return_value = datetime.now(
+        timezone.utc
+    ) + timedelta(hours=1)
+
+    # Instantiate Sub-Services
+    risk_manager = RiskManager(mock_ig)
+    market_analyzer = MarketAnalyzer(market_data, news_client, analyst)
+    trade_executor = TradeExecutor(mock_ig, streamer, mock_status, dry_run=False)
 
     engine = StrategyEngine(
         analyzer=market_analyzer,

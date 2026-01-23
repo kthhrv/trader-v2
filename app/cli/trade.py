@@ -93,7 +93,8 @@ async def run_test_trade(
 
             # 5. Execute
             streamer = StreamerService(ig_client)
-            executor = TradeExecutor(ig_client, streamer, dry_run)
+            market_status = MarketStatusService()
+            executor = TradeExecutor(ig_client, streamer, market_status, dry_run)
 
             # Initialize Engine to save signal
             collector = CollectorService(ig_client)
@@ -148,8 +149,8 @@ async def run_market_strategy(
 
         risk_manager = RiskManager(ig_client)
         analyzer = MarketAnalyzer(market_data, news_client, analyst)
-        executor = TradeExecutor(ig_client, streamer, dry_run)
         market_status = MarketStatusService()
+        executor = TradeExecutor(ig_client, streamer, market_status, dry_run)
 
         engine = StrategyEngine(
             analyzer=analyzer,

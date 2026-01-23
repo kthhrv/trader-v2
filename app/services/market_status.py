@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 import holidays
 from app.core.logger import logger
@@ -114,3 +114,55 @@ class MarketStatusService:
         if d.month == 1 and d.day <= 4:
             return True
         return False
+
+    def _get_market_hours(self, epic: str) -> dict:
+        """
+        Returns the market hours (open/close) for a given epic.
+        Times are in the market's local timezone.
+        """
+        country = self._get_country_code(epic)
+
+        # Default fallback
+        schedule = {"open": "09:00", "close": "17:00", "timezone": "UTC"}
+
+        if country == "GB":  # FTSE
+            schedule = {"open": "08:00", "close": "16:30", "timezone": "Europe/London"}
+        elif country == "US":  # SPX, NASDAQ, DOW
+            schedule = {
+                "open": "09:30",
+                "close": "16:00",
+                "timezone": "America/New_York",
+            }
+        elif country == "JP":  # Nikkei
+            schedule = {"open": "09:00", "close": "15:00", "timezone": "Asia/Tokyo"}
+        elif country == "DE":  # DAX
+            schedule = {"open": "09:00", "close": "17:30", "timezone": "Europe/Berlin"}
+        elif country == "AU":  # ASX
+            schedule = {
+                "open": "10:00",
+                "close": "16:00",
+                "timezone": "Australia/Sydney",
+            }
+
+        return schedule
+
+    def get_market_close_datetime(self, epic: str) -> datetime:
+        """
+        Returns the next market close time as a localized datetime object.
+        """
+        schedule = self._get_market_hours(epic)
+        close_time_str = schedule["close"]
+        timezone_str = schedule["timezone"]
+
+        tz = ZoneInfo(timezone_str)
+        now_tz = datetime.now(tz)
+
+        hour, minute = map(int, close_time_str.split(":"))
+
+        close_dt = now_tz.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+        # If it's already past today's close, the next close is tomorrow (simplification)
+        if now_tz > close_dt:
+            close_dt += timedelta(days=1)
+
+        return close_dt
