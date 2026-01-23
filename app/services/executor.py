@@ -323,128 +323,96 @@ class TradeExecutor:
 
     async def _sync_outcome(self, deal_id: str):
         """Fetches final outcome from IG history and updates DB."""
-        # Wait a moment for IG to index the transaction
-        await asyncio.sleep(5)
 
-        try:
-            # We assume it closed recently (look back 24h)
-            history = await self.ig_client.fetch_transaction_history(
-                max_span_seconds=3600 * 24,
-                env_type=settings.TRADING_ACCOUNT_ENV,
-            )
+        # Retry loop to handle API lag
+        for attempt in range(5):
+            await asyncio.sleep(2 * (attempt + 1))  # 2s, 4s, 6s... backoff
 
-            transactions = history.get("transactions", [])
+            try:
+                # Re-query DB to get context
+                async with db_session.async_session_maker() as session:
+                    stmt = select(TradeExecution).where(
+                        TradeExecution.deal_id == deal_id
+                    )
+                    result = await session.execute(stmt)
+                    execution = result.scalars().first()
 
-            # Find the closing transaction for this deal
-            # IG History: 'reference' often points to the closing deal ref, 'dealId' is the closing deal ID.
-            # We look for a transaction where we can link it.
-            # Often the easiest way is matching the instrument and direction/size reversely, or just latest close.
-            # But specific deal linking is tricky.
-            # However, if we just closed it, it should be the most recent one.
-
-            # Better strategy: Look for a transaction that mentions our deal_id?
-            # Or just assume the latest transaction for this Epic?
-            # We don't have epic here easily without querying DB or passing it.
-            # Let's rely on finding a transaction that matches the deal_id if possible?
-            # IG V2 History JSON: { transactions: [ { date, dealId, reference, ... } ] }
-            # Usually 'dealId' in history is unique for that transaction.
-
-            # If the trade was closed by a Stop/Limit, the system generates a NEW deal ID for the closing leg.
-            # But we might find the "Profit/Loss" entry.
-
-            for tx in transactions:
-                # Basic match attempt: if PnL is non-zero, it's a candidate
-                pnl_str = tx.get("profitAndLoss", "0")
-                if pnl_str == "0":
-                    continue
-
-                # If we could match Epic or something...
-                # For now, let's take the most recent closing transaction if it looks plausible?
-                # This is risky.
-
-                # Let's try to match via DB query first to get the Epic
-                pass
-
-            # Re-query DB to get context
-            async with db_session.async_session_maker() as session:
-                stmt = select(TradeExecution).where(TradeExecution.deal_id == deal_id)
-                result = await session.execute(stmt)
-                execution = result.scalars().first()
-
-                if execution:
-                    # Now we have execution context (fill_price, direction, size)
-                    # We can try to match in history
-
-                    for tx in transactions:
-                        # Check PnL presence
-                        pnl_str = tx.get("profitAndLoss", "")
-                        if not pnl_str or pnl_str == "0":
-                            continue
-
-                        # Parse PnL
-                        try:
-                            clean_pnl = float(
-                                pnl_str.replace("£", "")
-                                .replace("$", "")
-                                .replace(",", "")
-                            )
-                        except ValueError:
-                            continue
-
-                        # Parse Signed Size for Direction
-                        # IG History Size: "+0.50" (BUY) or "-0.50" (SELL)
-                        tx_size_str = tx.get("size", "")
-                        if not tx_size_str:
-                            continue
-
-                        # The closing transaction has the OPPOSITE sign of the opening position.
-                        # Opening BUY (+ size in position) -> Closing transaction is - size (SELL)
-                        # Opening SELL (- size in position) -> Closing transaction is + size (BUY)
-
-                        is_plus = tx_size_str.startswith("+")
-                        is_minus = tx_size_str.startswith("-")
-
-                        open_dir = execution.direction.upper()  # BUY or SELL
-
-                        # Logic:
-                        # If we opened BUY, we expect a '-' transaction to close.
-                        # If we opened SELL, we expect a '+' transaction to close.
-                        if open_dir == "BUY" and not is_minus:
-                            continue
-                        if open_dir == "SELL" and not is_plus:
-                            continue
-
-                        # Also check if reference matches or if it's the right instrument
-                        # Note: In the logs, 'reference' often matches our opening deal_id
-                        tx_ref = tx.get("reference")
-                        if tx_ref and tx_ref != deal_id:
-                            # If it doesn't match the deal_id, it might be a different trade
-                            continue
-
-                        # Found a match!
-                        final_pnl = clean_pnl
-
-                        # Extract Exit Price
-                        close_level = tx.get("closeLevel") or tx.get("level")
-                        final_exit = float(close_level) if close_level else 0.0
-
-                        # Update DB
-                        execution.outcome_status = "WIN" if final_pnl > 0 else "LOSS"
-                        execution.pnl = final_pnl
-                        execution.exit_price = final_exit
-                        execution.exit_time = datetime.now(timezone.utc)
-
-                        session.add(execution)
-                        await session.commit()
-                        logger.info(
-                            f"Deal {deal_id} synced: PnL={final_pnl}, Exit={final_exit}"
-                        )
+                    if not execution:
+                        logger.error(f"Execution record not found for {deal_id}")
                         return
 
-            logger.warning(f"Could not find matching history for {deal_id}")
+                    # 1. Find the Closing Deal ID from Activity History (V3)
+                    # The closing activity will reference our opening deal ID in 'affectedDealId'
+                    activity_history = await self.ig_client.fetch_activity_history(
+                        max_span_seconds=3600 * 24,
+                        env_type=settings.TRADING_ACCOUNT_ENV,
+                    )
+                    activities = activity_history.get("activities", [])
+                    closing_deal_id = None
 
-        except Exception as e:
-            logger.error(f"Failed to sync outcome for {deal_id}: {e}")
+                    for act in activities:
+                        details = act.get("details", {})
+                        actions = details.get("actions", [])
+                        for action in actions:
+                            if (
+                                action.get("affectedDealId") == deal_id
+                                and action.get("actionType") == "POSITION_CLOSED"
+                            ):
+                                closing_deal_id = act.get("dealId")
+                                break
+                        if closing_deal_id:
+                            break
+
+                    if not closing_deal_id:
+                        logger.info(
+                            f"Sync Attempt {attempt + 1}: No closing activity found for {deal_id} yet."
+                        )
+                        continue
+
+                    # 2. Get PnL and Exit Price from Transaction History (V1)
+                    # The transaction for the closing leg will have 'reference' == closing_deal_id
+                    history = await self.ig_client.fetch_transaction_history(
+                        max_span_seconds=3600 * 24,
+                        env_type=settings.TRADING_ACCOUNT_ENV,
+                    )
+                    transactions = history.get("transactions", [])
+
+                    for tx in transactions:
+                        if tx.get("reference") == closing_deal_id:
+                            # Found the closing transaction details!
+                            pnl_raw = tx.get("profitAndLoss", "0")
+                            try:
+                                clean_pnl = float(
+                                    str(pnl_raw)
+                                    .replace("£", "")
+                                    .replace("$", "")
+                                    .replace(",", "")
+                                )
+                            except ValueError:
+                                clean_pnl = 0.0
+
+                            close_level = tx.get("closeLevel") or tx.get("level")
+                            final_exit = float(close_level) if close_level else 0.0
+
+                            # Update DB
+                            execution.outcome_status = (
+                                "WIN" if clean_pnl > 0 else "LOSS"
+                            )
+                            execution.pnl = clean_pnl
+                            execution.exit_price = final_exit
+                            execution.exit_time = datetime.now(timezone.utc)
+
+                            session.add(execution)
+                            await session.commit()
+                            logger.info(
+                                f"Deal {deal_id} synced via activity link {closing_deal_id}: PnL={clean_pnl}, Exit={final_exit}"
+                            )
+                            return  # Success
+
+            except Exception as e:
+                logger.warning(f"Sync attempt {attempt + 1} failed for {deal_id}: {e}")
+
+        logger.error(f"Could not find matching history for {deal_id} after retries")
 
     async def _save_execution(
         self, signal_id, deal_id, direction, fill_price, size, stop_loss

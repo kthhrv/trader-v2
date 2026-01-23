@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Any
 import httpx
 from tenacity import (
@@ -399,6 +400,45 @@ class AsyncIGClient:
             logger.error(f"Failed to fetch history: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
+    async def fetch_activity_history(
+        self,
+        max_span_seconds: int = 86400,
+        deal_id: Optional[str] = None,
+        env_type: str = "LIVE",
+    ) -> Dict[str, Any]:
+        """
+        Fetches activity history. Uses Version 3.
+        Supports filtering by deal_id directly.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+
+        url = "history/activity"
+
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(seconds=max_span_seconds)
+        from_str = start.strftime("%Y-%m-%dT%H:%M:%S")
+        to_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+        params: Dict[str, Any] = {"detailed": "true", "from": from_str, "to": to_str}
+
+        if deal_id:
+            # Note: IG API V3 docs say dealId filter is supported
+            params["dealId"] = deal_id
+
+        headers = {"VERSION": "3"}
+
+        try:
+            response = await client.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to fetch activity history: {e.response.text}")
+            raise IGClientError(f"HTTP {e.response.status_code}")
+
     async def close_open_position(
         self,
         deal_id: str,
@@ -408,8 +448,7 @@ class AsyncIGClient:
     ) -> Dict[str, Any]:
         """
         Closes an open position.
-        Direction should be the OPPOSITE of the opening direction (or just use direction from position).
-        Actually IG API for closing OTC positions requires the closing direction.
+        Direction should be the OPPOSITE of the opening direction.
         """
         env_type = self._normalize_env(env_type)
         if env_type not in self.auth_tokens:
