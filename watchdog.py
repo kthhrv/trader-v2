@@ -13,7 +13,14 @@ async def check_liveness():
     notifier = HomeAssistantNotifier()
     last_alert_sent = None
 
-    logger.info(f"Watchdog started. Monitoring {HEARTBEAT_FILE}")
+    if not notifier.token:
+        logger.warning(
+            "Watchdog started WITHOUT notifications (HA_ACCESS_TOKEN missing). Alerts will only be logged."
+        )
+    else:
+        logger.info(
+            f"Watchdog started. Monitoring {HEARTBEAT_FILE}. Notifications enabled."
+        )
 
     while True:
         try:
