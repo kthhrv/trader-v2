@@ -22,6 +22,18 @@ def publish(c):
 
 
 @task
+def build(c):
+    """
+    Build the Docker image locally (without pushing).
+    """
+    image_name = "trader-v2"
+    git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
+
+    print(f"Building {image_name} (SHA: {git_sha[:7]})...")
+    c.run(f"docker build --build-arg GIT_COMMIT_SHA={git_sha} -t {image_name}:latest .")
+
+
+@task
 def ui(c):
     """
     Start the Streamlit UI dashboard locally.

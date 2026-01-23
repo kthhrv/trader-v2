@@ -2,6 +2,7 @@ import asyncio
 import sys
 import argparse
 from app.core.logger import logger, configure_logging, enable_notification_handler
+from app.core.config import settings
 from app.database.session import init_db
 from app.core.markets import MARKET_CONFIGS
 from app.cli.trade import run_market_strategy, run_test_trade
@@ -108,6 +109,7 @@ async def main():
 
     # 0. Configure Logging
     configure_logging(args.verbose)
+    logger.info(f"Trader V2 Startup | Build: {settings.GIT_COMMIT_SHA}")
 
     # Enable HA Notifications (Critical Alerts)
     enable_notification_handler()

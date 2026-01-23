@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     HA_ACCESS_TOKEN: Optional[SecretStr] = None
     HA_NOTIFY_ENTITY: str = "notify.mobile_app_pixel_8"
 
+    # --- Build Info ---
+    GIT_COMMIT_SHA: str = Field(default="unknown", alias="GIT_COMMIT_SHA")
+
     @property
     def trading_credentials(self) -> dict:
         """Returns the credential set configured for TRADING."""

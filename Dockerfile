@@ -57,6 +57,10 @@ COPY --from=builder /app/app/adapters/js/node_modules /app/app/adapters/js/node_
 # Copy application code
 COPY . .
 
+# Receive Git Commit SHA from build args
+ARG GIT_COMMIT_SHA
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
+
 # Expose ports
 EXPOSE 8000
 
