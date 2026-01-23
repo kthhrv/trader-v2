@@ -99,6 +99,10 @@ class AsyncIGClient:
                 return
 
             client = await self._get_session(env_type)
+            # Clear old tokens if any to ensure a clean login request
+            client.headers.pop("CST", None)
+            client.headers.pop("X-SECURITY-TOKEN", None)
+
             creds = (
                 settings._get_live_credentials()
                 if env_type == "LIVE"
@@ -153,6 +157,58 @@ class AsyncIGClient:
                 logger.error(f"IG Auth Error ({env_type}): {e}")
                 raise IGAuthenticationError(str(e))
 
+    async def _api_request(
+        self, method: str, endpoint: str, env_type: str = "LIVE", **kwargs
+    ) -> httpx.Response:
+        """
+        Internal helper to make API requests with auto-reauthentication on 401.
+        """
+        env_type = self._normalize_env(env_type)
+        if env_type not in self.auth_tokens:
+            await self.authenticate(env_type)
+
+        client = await self._get_session(env_type)
+
+        try:
+            response = await client.request(method, endpoint, **kwargs)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as e:
+            # Check for 401 or specific IG token errors
+            # IG sometimes returns 401 for expired tokens, sometimes 403 with specific error codes
+            is_token_error = (
+                e.response.status_code == 401
+                or "error.security.client-token-missing" in e.response.text
+                or "error.security.client-token-invalid" in e.response.text
+            )
+
+            if is_token_error:
+                logger.warning(
+                    f"Token expired/missing for {env_type}. Re-authenticating..."
+                )
+
+                # Invalidate local token
+                if env_type in self.auth_tokens:
+                    del self.auth_tokens[env_type]
+
+                # Clear session headers to prevent them being sent during re-auth or retry
+                client.headers.pop("CST", None)
+                client.headers.pop("X-SECURITY-TOKEN", None)
+
+                # Re-authenticate
+                # Note: authenticate() has a lock, so it handles concurrency
+                await self.authenticate(env_type)
+
+                # Retry the request once
+                # Note: 'authenticate' updates the session headers, so 'client' is already fresh
+                logger.info(f"Retrying request to {endpoint} after re-auth")
+                response = await client.request(method, endpoint, **kwargs)
+                response.raise_for_status()
+                return response
+            else:
+                # Re-raise other HTTP errors
+                raise e
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -161,17 +217,12 @@ class AsyncIGClient:
     async def fetch_historical_prices(
         self, epic: str, resolution: str, num_points: int, env_type: str = "LIVE"
     ) -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         url = f"prices/{epic}/{resolution}/{num_points}"
         headers = {"VERSION": "2"}
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch prices for {epic}: {e.response.text}")
@@ -190,17 +241,12 @@ class AsyncIGClient:
         end_date: str,
         env_type: str = "LIVE",
     ) -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         url = f"prices/{epic}/{resolution}/{start_date}/{end_date}"
         headers = {"VERSION": "2"}
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch prices range for {epic}: {e.response.text}")
@@ -217,17 +263,12 @@ class AsyncIGClient:
         """
         Fetches full market details including snapshot (Bid/Offer).
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         url = f"markets/{epic}"
         headers = {"VERSION": "3"}
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(
@@ -236,16 +277,11 @@ class AsyncIGClient:
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
     async def get_account_balance(self, env_type: str = "DEMO") -> float:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "1"}
-
         try:
-            response = await client.get("/accounts", headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", "/accounts", env_type=env_type, headers=headers
+            )
             accounts = response.json().get("accounts", [])
             if not accounts:
                 return 0.0
@@ -263,17 +299,12 @@ class AsyncIGClient:
     async def search_markets(
         self, search_term: str, env_type: str = "LIVE"
     ) -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         url = f"markets?searchTerm={search_term}"
         headers = {"VERSION": "1"}
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Search failed: {e.response.text}")
@@ -291,17 +322,12 @@ class AsyncIGClient:
         Fetches basic market details by epic (lighter than fetch_market_details).
         Useful for getting marketId.
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "3"}
         url = f"markets/{epic}"
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch market {epic}: {e.response.text}")
@@ -318,17 +344,12 @@ class AsyncIGClient:
         """
         Fetches client sentiment (long/short %) for a given market ID.
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "1"}
         url = f"clientsentiment/{market_id}"
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, env_type=env_type, headers=headers
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.warning(
@@ -343,35 +364,27 @@ class AsyncIGClient:
         limit_level: Optional[float] = None,
         env_type: str = "LIVE",
     ):
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "2", "_method": "PUT"}
         payload = {"stopLevel": stop_level, "limitLevel": limit_level}
-
         try:
-            response = await client.put(
-                f"/positions/otc/{deal_id}", json=payload, headers=headers
+            response = await self._api_request(
+                "PUT",
+                f"/positions/otc/{deal_id}",
+                json=payload,
+                headers=headers,
+                env_type=env_type,
             )
-            response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to update position {deal_id}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def fetch_open_positions(self, env_type: str = "LIVE") -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "2"}
-
         try:
-            response = await client.get("/positions", headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", "/positions", headers=headers, env_type=env_type
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch open positions: {e.response.text}")
@@ -380,21 +393,16 @@ class AsyncIGClient:
     async def fetch_transaction_history(
         self, max_span_seconds: int = 172800, env_type: str = "LIVE"
     ) -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         # API expects milliseconds
         period_millis = max_span_seconds * 1000
 
         # Using V1 endpoint (V2 often problematic for history?)
         headers = {"VERSION": "1"}
         url = f"/history/transactions/ALL_DEAL/{period_millis}"
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, headers=headers, env_type=env_type
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch history: {e.response.text}")
@@ -410,12 +418,6 @@ class AsyncIGClient:
         Fetches activity history. Uses Version 3.
         Supports filtering by deal_id directly.
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
-
         url = "history/activity"
 
         now = datetime.now(timezone.utc)
@@ -430,10 +432,10 @@ class AsyncIGClient:
             params["dealId"] = deal_id
 
         headers = {"VERSION": "3"}
-
         try:
-            response = await client.get(url, headers=headers, params=params)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, headers=headers, params=params, env_type=env_type
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to fetch activity history: {e.response.text}")
@@ -450,11 +452,6 @@ class AsyncIGClient:
         Closes an open position.
         Direction should be the OPPOSITE of the opening direction.
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "1", "_method": "DELETE"}
         payload = {
             "dealId": deal_id,
@@ -462,13 +459,19 @@ class AsyncIGClient:
             "size": size,
             "orderType": "MARKET",
         }
-
         try:
             # IG uses DELETE for closing OTC positions
-            response = await client.post(
-                "/positions/otc", json=payload, headers=headers
+            # Note: We use POST with _method=DELETE if the client doesn't support DELETE with body,
+            # but httpx handles DELETE with body fine. However, IG often expects POST to /positions/otc
+            # with _method=DELETE header.
+            # The original code used client.post("/positions/otc", ...)
+            response = await self._api_request(
+                "POST",
+                "/positions/otc",
+                json=payload,
+                headers=headers,
+                env_type=env_type,
             )
-            response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to close position {deal_id}: {e.response.text}")
@@ -480,17 +483,12 @@ class AsyncIGClient:
         """
         Fetches the confirmation for a deal reference to get the actual Deal ID.
         """
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         headers = {"VERSION": "1"}
         url = f"/confirms/{deal_reference}"
-
         try:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
+            response = await self._api_request(
+                "GET", url, headers=headers, env_type=env_type
+            )
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(
@@ -507,11 +505,6 @@ class AsyncIGClient:
         limit_level: Optional[float] = None,
         env_type: str = "DEMO",
     ) -> Dict[str, Any]:
-        env_type = self._normalize_env(env_type)
-        if env_type not in self.auth_tokens:
-            await self.authenticate(env_type)
-
-        client = await self._get_session(env_type)
         payload = {
             "epic": epic,
             "direction": direction,
@@ -525,12 +518,14 @@ class AsyncIGClient:
             "expiry": "DFB",
         }
         headers = {"VERSION": "2"}
-
         try:
-            response = await client.post(
-                "/positions/otc", json=payload, headers=headers
+            response = await self._api_request(
+                "POST",
+                "/positions/otc",
+                json=payload,
+                headers=headers,
+                env_type=env_type,
             )
-            response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Order placement failed: {e.response.text}")
