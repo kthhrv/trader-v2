@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import asyncio
+import json
 from typing import Optional
 from sqlmodel import select
 
@@ -202,7 +203,39 @@ class TradeExecutor:
                 logger.info("Monitor timeout.")
                 break
 
-            # Periodic Liveness Check (every 60s)
+            # 1. Handle Trade Updates (Immediate Closure Detection)
+            if update.get("type") == "trade_update":
+                payload_str = update.get("payload")
+                if payload_str:
+                    try:
+                        data = json.loads(payload_str)
+                        update_deal_id = data.get("dealId")
+                        affected_id = data.get("affectedDealId")
+                        status = data.get("status")
+                        deal_status = data.get("dealStatus")
+
+                        # Check if this update relates to our trade
+                        is_match = (update_deal_id == deal_id) or (
+                            affected_id == deal_id
+                        )
+
+                        if is_match:
+                            # Check for closure
+                            is_closed = (status in ["CLOSED", "DELETED"]) or (
+                                deal_status == "ACCEPTED" and status == "CLOSED"
+                            )
+
+                            if is_closed:
+                                logger.info(
+                                    f"STREAM: Deal {deal_id} CLOSED via trade update."
+                                )
+                                await self._sync_outcome(deal_id)
+                                break
+                    except json.JSONDecodeError:
+                        pass
+                continue
+
+            # 2. Periodic Liveness Check (Fallback)
             if (now - last_check_time) > 60:
                 last_check_time = now
                 if not await self._is_position_open(deal_id):
