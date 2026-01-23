@@ -36,10 +36,10 @@ def build(c):
 @task
 def ui(c):
     """
-    Start the Streamlit UI dashboard locally.
+    Start the Reflex UI dashboard locally.
     """
-    print("Starting Trader V2 Dashboard...")
-    c.run("streamlit run app/ui/app.py")
+    print("Starting Trader V2 Dashboard (Reflex)...")
+    c.run("cd dashboard && reflex run")
 
 
 @task

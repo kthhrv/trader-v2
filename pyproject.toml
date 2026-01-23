@@ -21,10 +21,10 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "sqlmodel>=0.0.31",
     "tenacity>=9.1.2",
-    "streamlit>=1.43.0",
     "plotly>=6.0.0",
     "watchdog>=6.0.0",
     "matplotlib>=3.10.0",
+    "reflex>=0.8.26",
 ]
 
 [dependency-groups]

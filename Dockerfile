@@ -15,6 +15,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -43,6 +44,7 @@ WORKDIR /app
 # Install ONLY Node.js runtime (no npm)
 RUN apt-get update && apt-get install -y \
     nodejs \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directories for mounts

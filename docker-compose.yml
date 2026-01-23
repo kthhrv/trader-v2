@@ -40,9 +40,11 @@ services:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
     container_name: trader-v2-ui
     restart: unless-stopped
-    command: ["uv", "run", "streamlit", "run", "app/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    working_dir: /app/dashboard
+    command: ["uv", "run", "reflex", "run", "--env", "prod", "--backend-host", "0.0.0.0"]
     ports:
-      - "8501:8501"
+      - "3000:3000"
+      - "8000:8000"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
