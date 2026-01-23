@@ -117,7 +117,10 @@ async def run_test_trade(
             # Save Signal for tracking
             signal_db = await engine.save_manual_signal(signal, "TEST_TRADE")
 
-            await executor.execute_trade(signal, epic, signal_db.id, max_spread)
+            try:
+                await executor.execute_trade(signal, epic, signal_db.id, max_spread)
+            finally:
+                await streamer.stop()
 
         except Exception as e:
             logger.exception(f"Test trade failed: {e}")
@@ -217,9 +220,15 @@ async def run_market_strategy(
                 )
                 return
 
-            await engine.execute_trade_plan(
-                signal, config["epic"], signal_db.id if signal_db else None, max_spread
-            )
+            try:
+                await engine.execute_trade_plan(
+                    signal,
+                    config["epic"],
+                    signal_db.id if signal_db else None,
+                    max_spread,
+                )
+            finally:
+                await streamer.stop()
 
         except Exception as e:
             logger.exception(f"Fatal error during execution: {e}")
