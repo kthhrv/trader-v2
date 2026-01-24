@@ -22,7 +22,6 @@ class Container:
         ig_client: AsyncIGClient,
         dry_run: bool = False,
         analyst_mode: bool = False,
-        yes_mode: bool = False,
     ) -> StrategyEngine:
         """
         Builds and returns a fully wired StrategyEngine stack.
@@ -49,5 +48,4 @@ class Container:
             executor=executor,
             market_status=market_status,
             analyst_mode=analyst_mode,
-            yes_mode=yes_mode,
         )

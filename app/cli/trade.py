@@ -144,7 +144,6 @@ async def run_market_strategy(
             ig_client,
             dry_run=dry_run,
             analyst_mode=analyst_mode,
-            yes_mode=yes,
         )
 
         try:

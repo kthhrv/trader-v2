@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Callable
 from app.core.logger import logger
 from app.core.markets import MARKET_CONFIGS
 from app.adapters.gemini_service import TradingSignal, Action
@@ -27,16 +27,18 @@ class StrategyEngine:
         executor: TradeExecutor,
         market_status: MarketStatusService,
         analyst_mode: bool = False,
-        yes_mode: bool = False,
     ):
         self.analyzer = analyzer
         self.risk_manager = risk_manager
         self.executor = executor
         self.market_status = market_status
         self.analyst_mode = analyst_mode
-        self.yes_mode = yes_mode
 
-    async def run_strategy(self, market_key: str) -> StrategyResult:
+    async def run_strategy(
+        self,
+        market_key: str,
+        confirmation_callback: Optional[Callable[[TradingSignal], bool]] = None,
+    ) -> StrategyResult:
         """
         Orchestrates the strategy flow: Analyze -> Validate -> Execute.
         """
@@ -54,29 +56,17 @@ class StrategyEngine:
             if not signal:
                 return StrategyResult.ERROR
 
-            # Print Plan for user
-            print("\n" + "=" * 50)
-            print(f"TRADING PLAN: {signal.ticker}")
-            print("=" * 50)
-            print(f"Action: {signal.action}")
-            print(f"Entry: {signal.entry} ({signal.entry_type})")
-            print(f"Stop: {signal.stop_loss}")
-            print(f"Target: {signal.take_profit}")
-            print(f"Size: {signal.size}")
-            print(f"Reasoning: {signal.reasoning}")
-            print("-" * 50)
-
             if self.analyst_mode:
-                return StrategyResult.EXECUTED  # Analyst mode counts as "done"
+                logger.info(f"ANALYST REPORT: {signal.ticker} -> {signal.action}")
+                return StrategyResult.EXECUTED
 
             if signal.action == Action.WAIT:
                 return StrategyResult.WAIT
 
-            # 2. Confirm (if not in 'yes' mode)
-            if not self.yes_mode:
-                confirm = input("\nExecute this plan? [y/N]: ").strip().lower()
-                if confirm != "y":
-                    logger.info("Execution cancelled by user.")
+            # 2. Confirm (Delegated to callback)
+            if confirmation_callback:
+                if not confirmation_callback(signal):
+                    logger.info("Execution cancelled by caller (callback).")
                     return StrategyResult.SKIPPED
 
             # 3. Validate

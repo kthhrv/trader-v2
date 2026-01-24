@@ -12,11 +12,12 @@ def test_container_creates_strategy_engine():
     mock_client = MagicMock()
 
     engine = Container.create_strategy_engine(
-        ig_client=mock_client, dry_run=True, analyst_mode=False, yes_mode=True
+        ig_client=mock_client,
+        dry_run=True,
+        analyst_mode=False,
     )
 
     assert isinstance(engine, StrategyEngine)
     assert isinstance(engine.analyzer, MarketAnalyzer)
     assert isinstance(engine.executor, TradeExecutor)
-    assert engine.yes_mode is True
     assert engine.executor.dry_run is True

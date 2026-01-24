@@ -36,9 +36,7 @@ async def test_strategy_engine_run_buy(mock_deps, monkeypatch):
     mock_risk.validate_signal = AsyncMock(return_value=True)
     mock_executor.execute_trade = AsyncMock()
 
-    engine = StrategyEngine(
-        mock_analyzer, mock_risk, mock_executor, mock_status, yes_mode=True
-    )
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
 
     mock_save = AsyncMock(return_value=mock_db_signal)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
@@ -105,9 +103,7 @@ async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
     mock_risk.validate_signal = AsyncMock(return_value=False)  # Fail
     mock_save = AsyncMock(return_value=MagicMock(id=123))
 
-    engine = StrategyEngine(
-        mock_analyzer, mock_risk, mock_executor, mock_status, yes_mode=True
-    )
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
     monkeypatch.setattr(engine, "_save_signal", mock_save)
 
     await engine.run_strategy("ftse")
