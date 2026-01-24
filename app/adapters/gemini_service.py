@@ -15,7 +15,6 @@ from tenacity import (
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.prompts import (
-    STRATEGY_ANALYST_INSTRUCTION,
     NEWS_ANALYST_INSTRUCTION,
     POST_MORTEM_INSTRUCTION,
 )
@@ -121,7 +120,10 @@ class GeminiService:
             return None
 
     async def analyze_market(
-        self, market_context: str, strategy_name: str = "Market Open"
+        self,
+        market_context: str,
+        system_instruction: str,
+        strategy_name: str = "Market Open",
     ) -> Optional[TradingSignal]:
         """
         Analyzes market data and returns a structured TradingSignal.
@@ -131,7 +133,7 @@ class GeminiService:
 {market_context}"""
 
         return await self._generate_structured(
-            prompt, STRATEGY_ANALYST_INSTRUCTION, TradingSignal
+            prompt, system_instruction, TradingSignal
         )
 
     async def assess_news(

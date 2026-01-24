@@ -7,6 +7,7 @@ from app.core.logger import logger
 from app.services.market_data import MarketDataService
 from app.adapters.news_client import NewsClient
 from app.adapters.gemini_service import GeminiService, TradingSignal
+from app.core.prompts import STRATEGY_PROMPTS
 from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
 
 
@@ -44,7 +45,11 @@ class MarketAnalyzer:
         context_str = self._format_context(regime, news_summary)
 
         # 4. AI Analysis
-        signal = await self.gemini.analyze_market(context_str)
+        strategy_id = config.get("strategy_id", "momentum_breakout")
+        instruction = STRATEGY_PROMPTS.get(
+            strategy_id, STRATEGY_PROMPTS["momentum_breakout"]
+        )
+        signal = await self.gemini.analyze_market(context_str, instruction)
         return signal
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:

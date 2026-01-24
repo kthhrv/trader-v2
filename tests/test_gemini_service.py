@@ -20,7 +20,7 @@ async def test_gemini_analyze_market_success():
     service.client.aio = MagicMock()
     service.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-    signal = await service.analyze_market("Market Context")
+    signal = await service.analyze_market("Market Context", "Test Instruction")
 
     assert isinstance(signal, TradingSignal)
     assert signal.ticker == "FTSE100"
