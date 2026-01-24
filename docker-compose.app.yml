@@ -9,6 +9,7 @@ services:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
     container_name: trader-v2
     restart: unless-stopped
+    command: ["python", "main.py", "--server", "--verbose"]
     networks:
       - trader-net
     volumes:

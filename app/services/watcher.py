@@ -18,6 +18,7 @@ class PriceSensor:
 
     def __init__(self, notifier: HomeAssistantNotifier):
         self.notifier = notifier
+        self.redis_client: Optional[redis.Redis] = None
         # window: {epic: deque([ (timestamp, price), ... ])}
         self.windows: Dict[str, deque] = {}
         self.window_seconds = 60
@@ -78,7 +79,20 @@ class PriceSensor:
 
         logger.warning(f"SPIKE DETECTED: {message}")
 
-        # Send HA Notification
+        # 1. Trigger Bot (Reflex) - Priority!
+        if self.redis_client:
+            payload = {
+                "command": "RUN_STRATEGY",
+                "market": next(
+                    (k for k, v in MARKET_CONFIGS.items() if v["epic"] == epic), None
+                ),
+                "reason": f"volatility_spike_{abs(change) * 100:.2f}pct",
+            }
+            if payload["market"]:
+                await self.redis_client.publish("trade_commands", json.dumps(payload))
+                logger.info(f"Triggered Strategy for {payload['market']}")
+
+        # 2. Send HA Notification (Background/Secondary)
         await self.notifier.send_notification(title, message, priority="high")
 
 
@@ -100,6 +114,9 @@ class WatcherService:
         self.redis_client = redis.Redis(
             host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True
         )
+        # Give sensor access to publisher
+        self.price_sensor.redis_client = self.redis_client
+
         pubsub = self.redis_client.pubsub()
         await pubsub.subscribe("market_data")
 

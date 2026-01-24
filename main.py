@@ -61,6 +61,11 @@ async def main():
         help="Start the background scheduler for all markets",
     )
     parser.add_argument(
+        "--server",
+        action="store_true",
+        help="Start the centralized Execution Server (Listener + Scheduler)",
+    )
+    parser.add_argument(
         "--watch",
         action="store_true",
         help="Start the real-time volatility watcher",
@@ -124,6 +129,12 @@ async def main():
         await init_db()
 
     # 2. Dispatch Commands
+    if args.server:
+        from app.cli.server import run_server_mode
+
+        await run_server_mode(args.dry_run)
+        return
+
     if args.scheduler:
         await run_scheduler(args.dry_run)
         return

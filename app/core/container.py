@@ -10,6 +10,7 @@ from app.services.analyzer import MarketAnalyzer
 from app.services.executor import TradeExecutor
 from app.services.market_status import MarketStatusService
 from app.services.watcher import WatcherService
+from app.services.command_listener import CommandListener
 from app.adapters.notification import HomeAssistantNotifier
 
 
@@ -51,6 +52,18 @@ class Container:
             market_status=market_status,
             analyst_mode=analyst_mode,
         )
+
+    @staticmethod
+    def create_command_listener(dry_run: bool = False) -> CommandListener:
+        """
+        Builds the CommandListener with a fully wired Engine.
+        """
+        ig_client = AsyncIGClient.get_instance()
+        # In Server mode, we default to EXECUTION (not analyst only) and NO CONFIRMATION (yes=True implicit)
+        engine = Container.create_strategy_engine(
+            ig_client, dry_run=dry_run, analyst_mode=False
+        )
+        return CommandListener(engine)
 
     @staticmethod
     def create_watcher() -> WatcherService:
