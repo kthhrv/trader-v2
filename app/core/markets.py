@@ -8,6 +8,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 7, "minute": 55},
         "max_spread": 2.0,
         "strategy_id": "momentum_breakout",
+        "stalking": {"enabled": False},
     },
     "spx": {
         "epic": "IX.D.SPTRD.DAILY.IP",
@@ -16,6 +17,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 9, "minute": 25},
         "max_spread": 1.6,
         "strategy_id": "us_volatility",
+        "stalking": {"enabled": True, "duration_minutes": 60, "interval_minutes": 5},
     },
     "nikkei": {
         "epic": "IX.D.NIKKEI.DAILY.IP",
@@ -24,6 +26,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 8, "minute": 55},
         "max_spread": 8.0,
         "strategy_id": "momentum_breakout",
+        "stalking": {"enabled": False},
     },
     "dax": {
         "epic": "IX.D.DAX.DAILY.IP",
@@ -32,6 +35,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 7, "minute": 55},
         "max_spread": 2.5,
         "strategy_id": "momentum_breakout",
+        "stalking": {"enabled": False},
     },
     "asx": {
         "epic": "IX.D.ASX.MONTH1.IP",
@@ -40,6 +44,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 9, "minute": 55},
         "max_spread": 3.0,
         "strategy_id": "momentum_breakout",
+        "stalking": {"enabled": False},
     },
     "nasdaq": {
         "epic": "IX.D.NASDAQ.CASH.IP",
@@ -48,5 +53,6 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 9, "minute": 25},
         "max_spread": 2.0,
         "strategy_id": "us_volatility",
+        "stalking": {"enabled": True, "duration_minutes": 60, "interval_minutes": 5},
     },
 }

@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional
 from app.core.logger import logger
 from app.core.markets import MARKET_CONFIGS
@@ -8,6 +9,14 @@ from app.services.executor import TradeExecutor
 from app.services.market_status import MarketStatusService
 from app.database import session as db_session
 from app.database.models import TradeSignal
+
+
+class StrategyResult(str, Enum):
+    EXECUTED = "EXECUTED"  # Trade placed or triggered
+    WAIT = "WAIT"  # AI said wait
+    SKIPPED = "SKIPPED"  # Risk validation failed or other skip logic
+    ERROR = "ERROR"  # Unexpected error or config issue
+    HOLIDAY = "HOLIDAY"  # Market closed for holiday
 
 
 class StrategyEngine:
@@ -25,7 +34,7 @@ class StrategyEngine:
         self.market_status = market_status
         self.analyst_mode = analyst_mode
 
-    async def run_strategy(self, market_key: str):
+    async def run_strategy(self, market_key: str) -> StrategyResult:
         """
         Orchestrates the strategy flow: Analyze -> Validate -> Execute.
         """
@@ -35,37 +44,48 @@ class StrategyEngine:
             logger.warning(
                 f"Market {market_key} is closed (Holiday). Skipping strategy."
             )
-            return
+            return StrategyResult.HOLIDAY
 
         # 1. Analyze
-        signal, signal_db = await self.generate_trade_signal(market_key)
-        if not signal:
-            return
+        try:
+            signal, signal_db = await self.generate_trade_signal(market_key)
+            if not signal:
+                return StrategyResult.ERROR
 
-        if self.analyst_mode:
-            logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
-            return
+            if self.analyst_mode:
+                logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
+                return StrategyResult.EXECUTED  # Analyst mode counts as "done"
 
-        if signal.action == Action.WAIT:
-            return
+            if signal.action == Action.WAIT:
+                return StrategyResult.WAIT
 
-        # 2. Validate
-        if not await self.validate_signal(signal):
-            logger.warning("Signal failed validation.")
-            return
+            # 2. Validate
+            if not await self.validate_signal(signal):
+                logger.warning("Signal failed validation.")
+                return StrategyResult.SKIPPED
 
-        # 3. Execute
-        if config:
-            max_spread = config.get("max_spread")
-            if max_spread is None:
-                logger.error(
-                    f"Configuration Error: 'max_spread' not defined for {config.get('name')}. Aborting."
+            # 3. Execute
+            if config:
+                max_spread = config.get("max_spread")
+                if max_spread is None:
+                    logger.error(
+                        f"Configuration Error: 'max_spread' not defined for {config.get('name')}. Aborting."
+                    )
+                    return StrategyResult.ERROR
+
+                await self.execute_trade_plan(
+                    signal,
+                    config["epic"],
+                    signal_db.id if signal_db else None,
+                    max_spread,
                 )
-                return
+                return StrategyResult.EXECUTED
 
-            await self.execute_trade_plan(
-                signal, config["epic"], signal_db.id if signal_db else None, max_spread
-            )
+            return StrategyResult.ERROR
+
+        except Exception as e:
+            logger.error(f"Strategy execution error: {e}")
+            return StrategyResult.ERROR
 
     async def generate_trade_signal(
         self, market_key: str
