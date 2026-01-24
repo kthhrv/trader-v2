@@ -2,17 +2,10 @@ import asyncio
 from datetime import datetime
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
-from app.adapters.gemini_service import GeminiService, Action, TradingSignal, EntryType
-from app.adapters.news_client import NewsClient
-from app.services.collector import CollectorService
-from app.services.market_data import MarketDataService
-from app.services.streamer import StreamerService
-from app.services.trader import StrategyEngine, StrategyResult
-from app.services.risk import RiskManager
-from app.services.analyzer import MarketAnalyzer
-from app.services.executor import TradeExecutor
-from app.services.market_status import MarketStatusService
+from app.adapters.gemini_service import Action, TradingSignal, EntryType
+from app.services.trader import StrategyResult
 from app.core.markets import MARKET_CONFIGS
+from app.core.container import Container
 
 
 async def run_test_trade(
@@ -94,19 +87,17 @@ async def run_test_trade(
                     return
 
             # 5. Execute
-            streamer = StreamerService(ig_client)
-            market_status = MarketStatusService()
-            executor = TradeExecutor(ig_client, streamer, market_status, dry_run)
+            engine = Container.create_strategy_engine(ig_client, dry_run=dry_run)
+            executor = engine.executor
 
-            # Initialize Engine to save signal
-            collector = CollectorService(ig_client)
-            market_data = MarketDataService(ig_client, collector)
-            engine = StrategyEngine(
-                analyzer=MarketAnalyzer(market_data, NewsClient(), GeminiService()),
-                risk_manager=RiskManager(ig_client),
-                executor=executor,
-                market_status=MarketStatusService(),
-            )
+            # Start streamer explicitly if accessed manually, though executor handles it?
+            # Executor takes streamer in constructor.
+            # We need to access streamer to stop it.
+            # engine.executor.streamer.stop() is cleaner if exposed, but executor has it private?
+            # engine.executor.streamer IS available as attribute if we didn't type hint it private.
+            # In Container: executor = TradeExecutor(ig_client, streamer...)
+            # We need access to the streamer instance to stop it in 'finally'.
+            # It's inside engine.executor.streamer.
 
             logger.info("Injecting Test Plan...")
             max_spread = config.get("max_spread")
@@ -122,7 +113,7 @@ async def run_test_trade(
             try:
                 await executor.execute_trade(signal, epic, signal_db.id, max_spread)
             finally:
-                await streamer.stop()
+                await executor.streamer.stop()
 
         except Exception as e:
             logger.exception(f"Test trade failed: {e}")
@@ -149,23 +140,9 @@ async def run_market_strategy(
     start_time = datetime.now()
 
     async with AsyncIGClient.get_instance() as ig_client:
-        # Initialize Stack
-        collector = CollectorService(ig_client)
-        market_data = MarketDataService(ig_client, collector)
-        analyst = GeminiService()
-        news_client = NewsClient()
-        streamer = StreamerService(ig_client)
-
-        risk_manager = RiskManager(ig_client)
-        analyzer = MarketAnalyzer(market_data, news_client, analyst)
-        market_status = MarketStatusService()
-        executor = TradeExecutor(ig_client, streamer, market_status, dry_run)
-
-        engine = StrategyEngine(
-            analyzer=analyzer,
-            risk_manager=risk_manager,
-            executor=executor,
-            market_status=market_status,
+        engine = Container.create_strategy_engine(
+            ig_client,
+            dry_run=dry_run,
             analyst_mode=analyst_mode,
             yes_mode=yes,
         )
@@ -199,4 +176,4 @@ async def run_market_strategy(
         except Exception as e:
             logger.exception(f"Fatal error during execution: {e}")
         finally:
-            await streamer.stop()
+            await engine.executor.streamer.stop()
