@@ -27,12 +27,14 @@ class StrategyEngine:
         executor: TradeExecutor,
         market_status: MarketStatusService,
         analyst_mode: bool = False,
+        yes_mode: bool = False,
     ):
         self.analyzer = analyzer
         self.risk_manager = risk_manager
         self.executor = executor
         self.market_status = market_status
         self.analyst_mode = analyst_mode
+        self.yes_mode = yes_mode
 
     async def run_strategy(self, market_key: str) -> StrategyResult:
         """
@@ -52,19 +54,37 @@ class StrategyEngine:
             if not signal:
                 return StrategyResult.ERROR
 
+            # Print Plan for user
+            print("\n" + "=" * 50)
+            print(f"TRADING PLAN: {signal.ticker}")
+            print("=" * 50)
+            print(f"Action: {signal.action}")
+            print(f"Entry: {signal.entry} ({signal.entry_type})")
+            print(f"Stop: {signal.stop_loss}")
+            print(f"Target: {signal.take_profit}")
+            print(f"Size: {signal.size}")
+            print(f"Reasoning: {signal.reasoning}")
+            print("-" * 50)
+
             if self.analyst_mode:
-                logger.info(f"ANALYST REPORT:\n{signal.model_dump_json(indent=2)}")
                 return StrategyResult.EXECUTED  # Analyst mode counts as "done"
 
             if signal.action == Action.WAIT:
                 return StrategyResult.WAIT
 
-            # 2. Validate
+            # 2. Confirm (if not in 'yes' mode)
+            if not self.yes_mode:
+                confirm = input("\nExecute this plan? [y/N]: ").strip().lower()
+                if confirm != "y":
+                    logger.info("Execution cancelled by user.")
+                    return StrategyResult.SKIPPED
+
+            # 3. Validate
             if not await self.validate_signal(signal):
                 logger.warning("Signal failed validation.")
                 return StrategyResult.SKIPPED
 
-            # 3. Execute
+            # 4. Execute
             if config:
                 max_spread = config.get("max_spread")
                 if max_spread is None:

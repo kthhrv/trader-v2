@@ -1,3 +1,5 @@
+import asyncio
+from datetime import datetime
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import GeminiService, Action, TradingSignal, EntryType
@@ -5,7 +7,7 @@ from app.adapters.news_client import NewsClient
 from app.services.collector import CollectorService
 from app.services.market_data import MarketDataService
 from app.services.streamer import StreamerService
-from app.services.trader import StrategyEngine
+from app.services.trader import StrategyEngine, StrategyResult
 from app.services.risk import RiskManager
 from app.services.analyzer import MarketAnalyzer
 from app.services.executor import TradeExecutor
@@ -130,17 +132,21 @@ async def run_market_strategy(
     market_key: str, dry_run: bool, analyst_mode: bool = False, yes: bool = False
 ):
     """
-    Executes the trading strategy for a specific market.
-    Used by both the Scheduler and the --market CLI command.
+    Executes the trading strategy for a specific market with stalking support.
     """
     logger.info(
-        f"Starting {market_key} strategy (Dry Run: {dry_run}, Analyst: {analyst_mode})..."
+        f"Starting {market_key} strategy (Dry Run: {dry_run}, Analyst: {analyst_mode}, Yes: {yes})..."
     )
 
     config = MARKET_CONFIGS.get(market_key)
     if not config:
         logger.error(f"Invalid market key: {market_key}")
         return
+
+    stalk_cfg = config.get("stalking", {"enabled": False})
+    duration = stalk_cfg.get("duration_minutes", 0)
+    interval = stalk_cfg.get("interval_minutes", 5)
+    start_time = datetime.now()
 
     async with AsyncIGClient.get_instance() as ig_client:
         # Initialize Stack
@@ -161,74 +167,36 @@ async def run_market_strategy(
             executor=executor,
             market_status=market_status,
             analyst_mode=analyst_mode,
+            yes_mode=yes,
         )
 
         try:
-            # 1. Generate Signal
-            signal, signal_db = await engine.generate_trade_signal(market_key)
+            while True:
+                # 1. Run Strategy
+                result = await engine.run_strategy(market_key)
 
-            if not signal:
-                logger.info("No signal generated.")
-                return
+                # 2. Handle Result
+                if (
+                    result == StrategyResult.WAIT
+                    and stalk_cfg.get("enabled")
+                    and not analyst_mode
+                ):
+                    elapsed = (datetime.now() - start_time).total_seconds() / 60
+                    if elapsed < duration:
+                        logger.info(
+                            f"Stalking {market_key}: AI said WAIT. Sleeping {interval}m... "
+                            f"(Elapsed: {elapsed:.1f}/{duration}m)"
+                        )
+                        await asyncio.sleep(interval * 60)
+                        continue
+                    else:
+                        logger.info(f"Stalking {market_key}: Duration expired. Ending.")
+                        break
 
-            # Print Plan
-            print("\n" + "=" * 50)
-            print(f"TRADING PLAN: {signal.ticker}")
-            print("=" * 50)
-            print(f"Action: {signal.action}")
-            print(f"Entry: {signal.entry}")
-            print(f"Stop: {signal.stop_loss}")
-            print(f"Target: {signal.take_profit}")
-            print(f"Size: {signal.size}")
-            print(f"Reasoning: {signal.reasoning}")
-            print("-" * 50)
-
-            if analyst_mode:
-                return
-
-            if signal.action == Action.WAIT:
-                logger.info("Signal is WAIT. Skipping execution.")
-                return
-
-            # 2. Confirm (Interactive Only)
-            # The scheduler calls this with yes=True implicitly (or we handle that logic in scheduler.py)
-            # For CLI usage, yes param controls confirmation.
-            if (
-                not yes and not dry_run
-            ):  # Dry run usually safe, but let's confirm unless forced
-                # Note: In scheduler mode, 'yes' should be True.
-                pass
-
-            # If we are in interactive CLI mode (implied by not being scheduled background task), ask.
-            # But here we just use the 'yes' flag.
-            if not yes:
-                confirm = input("\nExecute this plan? [y/N]: ").strip().lower()
-                if confirm != "y":
-                    logger.info("Execution cancelled by user.")
-                    return
-
-            # 3. Validate
-            if not await engine.validate_signal(signal):
-                logger.error("Signal failed validation (Risk/Balance). Aborting.")
-                return
-
-            # 4. Execute
-            max_spread = config.get("max_spread")
-            if max_spread is None:
-                logger.error(
-                    f"Configuration Error: 'max_spread' not defined for {market_key}. Aborting."
-                )
-                return
-
-            try:
-                await engine.execute_trade_plan(
-                    signal,
-                    config["epic"],
-                    signal_db.id if signal_db else None,
-                    max_spread,
-                )
-            finally:
-                await streamer.stop()
+                # For any other result (EXECUTED, SKIPPED, ERROR, HOLIDAY), or if stalking disabled
+                break
 
         except Exception as e:
             logger.exception(f"Fatal error during execution: {e}")
+        finally:
+            await streamer.stop()

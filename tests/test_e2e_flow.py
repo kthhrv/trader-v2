@@ -140,6 +140,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
         executor=trade_executor,
         market_status=mock_status,
         analyst_mode=False,
+        yes_mode=True,
     )
 
     # Mock datetime to simulate passage of time for throttling
