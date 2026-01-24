@@ -23,7 +23,7 @@ services:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
     container_name: trader-v2-watchdog
     restart: unless-stopped
-    command: ["uv", "run", "python", "watchdog.py"]
+    command: ["python", "watchdog.py"]
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
@@ -41,7 +41,7 @@ services:
     container_name: trader-v2-ui
     restart: unless-stopped
     working_dir: /app/dashboard
-    command: ["uv", "run", "reflex", "run", "--env", "prod", "--backend-host", "0.0.0.0"]
+    command: ["reflex", "run", "--env", "prod", "--backend-host", "0.0.0.0"]
     ports:
       - "3000:3000"
       - "8000:8000"

@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
     unzip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -45,6 +46,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     nodejs \
     unzip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directories for mounts
