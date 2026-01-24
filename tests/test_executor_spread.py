@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from app.services.executor import TradeExecutor
+from app.adapters.gemini_service import EntryType
 
 
 @pytest.fixture
@@ -37,7 +38,11 @@ async def test_wait_for_trigger_respects_spread(mock_deps):
     # Update 2: Offer 100 >= 99. Spread 2 <= 5. TRIGGER.
 
     result = await executor._wait_for_trigger(
-        epic="CS.D.TEST.123", direction="BUY", target_entry=99.0, max_spread=5.0
+        epic="CS.D.TEST.123",
+        direction="BUY",
+        target_entry=99.0,
+        entry_type=EntryType.BREAKOUT,
+        max_spread=5.0,
     )
 
     assert result == 100.0

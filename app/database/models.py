@@ -24,6 +24,7 @@ class TradeSignal(SQLModel, table=True):
 
     # Plan Parameters
     entry_price: float
+    entry_type: str = "BREAKOUT"  # Default to BREAKOUT
     stop_loss: float
     take_profit: Optional[float] = None
     position_size: float

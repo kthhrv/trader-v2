@@ -105,6 +105,7 @@ class StrategyEngine:
                 confidence=signal.confidence,
                 reasoning=signal.reasoning,
                 entry_price=signal.entry,
+                entry_type=signal.entry_type.value,
                 stop_loss=signal.stop_loss,
                 take_profit=signal.take_profit,
                 position_size=signal.size,

@@ -32,6 +32,8 @@ class Action(str, Enum):
 
 class EntryType(str, Enum):
     BREAKOUT = "BREAKOUT"
+    PULLBACK = "PULLBACK"
+    INSTANT = "INSTANT"
 
 
 class NewsQuality(BaseModel):

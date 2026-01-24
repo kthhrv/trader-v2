@@ -7,7 +7,7 @@ from sqlmodel import select
 from app.core.config import settings
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
-from app.adapters.gemini_service import TradingSignal, Action
+from app.adapters.gemini_service import TradingSignal, Action, EntryType
 from app.services.streamer import StreamerService
 from app.services.market_status import MarketStatusService
 from app.database import session as db_session
@@ -42,20 +42,25 @@ class TradeExecutor:
             return
 
         direction = "BUY" if signal.action == Action.BUY else "SELL"
+        triggered_price = None
 
-        # 1. Wait for Trigger
-        logger.info(
-            f"Waiting for trigger: {direction} @ {signal.entry} (Max Spread: {max_spread})..."
-        )
-        triggered_price = await self._wait_for_trigger(
-            epic, direction, signal.entry, max_spread
-        )
+        # 1. Trigger Logic
+        if signal.entry_type == EntryType.INSTANT:
+            logger.info("Entry Type: INSTANT. Executing Market Order immediately.")
+            triggered_price = signal.entry
+        else:
+            logger.info(
+                f"Waiting for trigger ({signal.entry_type}): {direction} @ {signal.entry} (Max Spread: {max_spread})..."
+            )
+            triggered_price = await self._wait_for_trigger(
+                epic, direction, signal.entry, signal.entry_type, max_spread
+            )
 
-        if not triggered_price:
-            logger.warning("Trigger timeout. Trade aborted.")
-            return
+            if not triggered_price:
+                logger.warning("Trigger timeout. Trade aborted.")
+                return
 
-        logger.info(f"Triggered at {triggered_price}! Executing {direction}...")
+            logger.info(f"Triggered at {triggered_price}! Executing {direction}...")
 
         # 2. Place Order
         try:
@@ -123,7 +128,12 @@ class TradeExecutor:
             logger.error(f"Execution Failed: {e}")
 
     async def _wait_for_trigger(
-        self, epic: str, direction: str, target_entry: float, max_spread: float
+        self,
+        epic: str,
+        direction: str,
+        target_entry: float,
+        entry_type: EntryType,
+        max_spread: float,
     ) -> Optional[float]:
         timeout = 5400
         start_time = datetime.now(timezone.utc).timestamp()
@@ -151,11 +161,24 @@ class TradeExecutor:
                     continue
 
                 if direction == "BUY":
-                    if offer >= target_entry:
-                        return offer
+                    if entry_type == EntryType.BREAKOUT:
+                        # Stop Entry: Buy when price RISES to target
+                        if offer >= target_entry:
+                            return offer
+                    elif entry_type == EntryType.PULLBACK:
+                        # Limit Entry: Buy when price FALLS to target
+                        if offer <= target_entry:
+                            return offer
+
                 elif direction == "SELL":
-                    if bid <= target_entry:
-                        return bid
+                    if entry_type == EntryType.BREAKOUT:
+                        # Stop Entry: Sell when price FALLS to target
+                        if bid <= target_entry:
+                            return bid
+                    elif entry_type == EntryType.PULLBACK:
+                        # Limit Entry: Sell when price RISES to target
+                        if bid >= target_entry:
+                            return bid
         return None
 
     async def _monitor_position(
