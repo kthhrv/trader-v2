@@ -60,6 +60,11 @@ async def main():
         action="store_true",
         help="Start the background scheduler for all markets",
     )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Start the real-time volatility watcher",
+    )
     parser.add_argument("--debug-search", type=str, help="Search for markets (debug)")
     parser.add_argument(
         "--yes", action="store_true", help="Skip confirmation prompt for execution"
@@ -121,6 +126,13 @@ async def main():
     # 2. Dispatch Commands
     if args.scheduler:
         await run_scheduler(args.dry_run)
+        return
+
+    if args.watch:
+        from app.core.container import Container
+
+        watcher = Container.create_watcher()
+        await watcher.start()
         return
 
     if args.scorecard:

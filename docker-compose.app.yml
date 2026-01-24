@@ -21,6 +21,27 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  watcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    container_name: trader-watcher
+    restart: unless-stopped
+    command: ["python", "main.py", "--watch"]
+    networks:
+      - trader-net
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - trader
+
   ui:
     build:
       context: .

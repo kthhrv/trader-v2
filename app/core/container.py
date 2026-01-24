@@ -9,6 +9,8 @@ from app.services.risk import RiskManager
 from app.services.analyzer import MarketAnalyzer
 from app.services.executor import TradeExecutor
 from app.services.market_status import MarketStatusService
+from app.services.watcher import WatcherService
+from app.adapters.notification import HomeAssistantNotifier
 
 
 class Container:
@@ -49,3 +51,11 @@ class Container:
             market_status=market_status,
             analyst_mode=analyst_mode,
         )
+
+    @staticmethod
+    def create_watcher() -> WatcherService:
+        """
+        Builds and returns the WatcherService.
+        """
+        notifier = HomeAssistantNotifier()
+        return WatcherService(notifier)
