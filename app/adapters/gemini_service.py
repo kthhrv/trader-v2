@@ -52,6 +52,7 @@ class TradingSignal(BaseModel):
     size: float
     atr: float
     use_trailing_stop: bool
+    timeout_seconds: int = 5400  # Default 90 minutes validity
     confidence: str
     reasoning: str
 

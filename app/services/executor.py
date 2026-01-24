@@ -53,7 +53,12 @@ class TradeExecutor:
                 f"Waiting for trigger ({signal.entry_type}): {direction} @ {signal.entry} (Max Spread: {max_spread})..."
             )
             triggered_price = await self._wait_for_trigger(
-                epic, direction, signal.entry, signal.entry_type, max_spread
+                epic,
+                direction,
+                signal.entry,
+                signal.entry_type,
+                max_spread,
+                signal.timeout_seconds,
             )
 
             if not triggered_price:
@@ -134,13 +139,13 @@ class TradeExecutor:
         target_entry: float,
         entry_type: EntryType,
         max_spread: float,
+        timeout_seconds: int = 5400,
     ) -> Optional[float]:
-        timeout = 5400
         start_time = datetime.now(timezone.utc).timestamp()
         last_spread_warn_time = 0.0
 
         async for update in self.streamer.stream(epic):
-            if (datetime.now(timezone.utc).timestamp() - start_time) > timeout:
+            if (datetime.now(timezone.utc).timestamp() - start_time) > timeout_seconds:
                 return None
 
             if update.get("type") == "price_update":
