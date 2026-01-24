@@ -119,6 +119,14 @@ async def run_test_trade(
             logger.exception(f"Test trade failed: {e}")
 
 
+def confirm_trade(signal: TradingSignal) -> bool:
+    """
+    User confirmation callback for the StrategyEngine.
+    """
+    confirm = input("\nExecute this plan? [y/N]: ").strip().lower()
+    return confirm == "y"
+
+
 async def run_market_strategy(
     market_key: str, dry_run: bool, analyst_mode: bool = False, yes: bool = False
 ):
@@ -139,6 +147,11 @@ async def run_market_strategy(
     interval = stalk_cfg.get("interval_minutes", 5)
     start_time = datetime.now()
 
+    # Determine callback based on 'yes' flag
+    # If yes=True, we bypass confirmation (callback is None).
+    # If yes=False, we pass the confirmation function.
+    confirmation_callback = None if yes else confirm_trade
+
     async with AsyncIGClient.get_instance() as ig_client:
         engine = Container.create_strategy_engine(
             ig_client,
@@ -149,7 +162,9 @@ async def run_market_strategy(
         try:
             while True:
                 # 1. Run Strategy
-                result = await engine.run_strategy(market_key)
+                result = await engine.run_strategy(
+                    market_key, confirmation_callback=confirmation_callback
+                )
 
                 # 2. Handle Result
                 if (
