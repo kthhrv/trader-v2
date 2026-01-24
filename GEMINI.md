@@ -11,4 +11,6 @@ V2 follows a modular service-oriented architecture with clear separation between
 - **Python**: 3.12+
 - **Database**: SQLModel (SQLite)
 - **AI**: Google Gemini (via `google-genai` SDK)
-- **Testing**: Pytest
+- **Testing**: pytest
+- **TypeCheck**: astral-ty
+- **Linting**: ruff
