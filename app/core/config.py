@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     # Select which account is used for Executing Trades
     TRADING_ACCOUNT_ENV: Literal["DEMO", "LIVE"] = "DEMO"
 
-    # Select which account is used for Fetching Market Data (Live often has better limits)
-    DATA_ACCOUNT_ENV: Literal["DEMO", "LIVE"] = "LIVE"
+    # Select which account is used for Fetching Market Data
+    DATA_ACCOUNT_ENV: Literal["DEMO", "LIVE"] = "DEMO"
 
     # --- Risk Management ---
     RISK_PER_TRADE_PERCENT: float = 0.01
@@ -49,6 +49,10 @@ class Settings(BaseSettings):
 
     # --- External Services ---
     GEMINI_API_KEY: SecretStr
+
+    # --- Redis ---
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
 
     HA_API_URL: str = "http://192.168.0.207:8123"
     HA_ACCESS_TOKEN: Optional[SecretStr] = None

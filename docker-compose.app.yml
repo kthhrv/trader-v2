@@ -9,28 +9,17 @@ services:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
     container_name: trader-v2
     restart: unless-stopped
+    networks:
+      - trader-net
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
     env_file:
       - .env
-
-  watchdog:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
-    container_name: trader-v2-watchdog
-    restart: unless-stopped
-    command: ["python", "watchdog.py"]
-    volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
-    env_file:
-      - .env
-    depends_on:
-      - trader
+    environment:
+      - REDIS_HOST=redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   ui:
     build:
@@ -45,6 +34,8 @@ services:
     ports:
       - "3000:3000"
       - "8000:8000"
+    networks:
+      - trader-net
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
@@ -52,3 +43,7 @@ services:
       - .env
     depends_on:
       - trader
+
+networks:
+  trader-net:
+    external: true

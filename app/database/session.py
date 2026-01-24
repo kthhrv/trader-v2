@@ -1,5 +1,6 @@
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
@@ -24,10 +25,12 @@ async_session_maker = sessionmaker(
 
 async def init_db():
     """
-    Initializes the database by creating all tables defined in SQLModel metadata.
+    Initializes the database by creating all tables and enabling WAL mode.
     """
     async with engine.begin() as conn:
-        # await conn.run_sync(SQLModel.metadata.drop_all) # Uncomment to reset DB
+        # Enable WAL mode for concurrent access
+        await conn.execute(text("PRAGMA journal_mode=WAL;"))
+        # await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
 
 

@@ -3,9 +3,8 @@
 ## Architecture Overview
 V2 follows a modular service-oriented architecture with clear separation between Domain models, Data access, and External adapters.
 
-## Key Changes & Technical Debt
-- **Interactive Confirmation in Engine**: `StrategyEngine.run_strategy` currently includes an `input()` call for manual confirmation when `yes_mode=False`. This violates the separation of concerns between the business logic (Engine) and the User Interface (CLI). 
-    - **Future Action**: Refactor `run_strategy` to be purely non-interactive. Move the confirmation prompt to the CLI runner (`app/cli/trade.py`), allowing the Engine to remain agnostic of the environment (Test/CLI/Scheduler).
+## Key Changes & Technical Debt (Resolved)
+- **Interactive Confirmation in Engine**: (FIXED) Refactored `StrategyEngine` to use a callback pattern. UI logic (Confirmation) now resides in `app/cli/trade.py`. The Engine is now purely non-interactive and decoupled from the CLI.
 
 ## Tech Stack
 - **Python**: 3.12+

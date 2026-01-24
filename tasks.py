@@ -64,3 +64,46 @@ def seed(c):
     """
     print("Seeding database with demo data...")
     c.run("PYTHONPATH=. uv run python app/database/seeder.py")
+
+
+@task
+def up(c):
+    """
+    Start the full 3-stack environment (Infra, App, Watchdog) locally.
+    """
+    print("--- 1. Creating Network ---")
+    c.run("docker network create trader-net || true")
+
+    print("\n--- 2. Starting Infra Stack (Redis, Streamer) ---")
+    c.run(
+        "docker compose -p trader-infra -f docker-compose.infra.yml up -d --build --remove-orphans"
+    )
+
+    print("\n--- 3. Starting App Stack (Trader, UI) ---")
+    c.run(
+        "docker compose -p trader-app -f docker-compose.app.yml up -d --build --remove-orphans"
+    )
+
+    print("\n--- 4. Starting Watchdog Stack ---")
+    c.run(
+        "docker compose -p trader-watchdog -f docker-compose.watchdog.yml up -d --build --remove-orphans"
+    )
+
+    print("\nAll stacks started. Use 'docker ps' to verify.")
+
+
+@task
+def down(c):
+    """
+    Stop and remove all 3 stacks (Infra, App, Watchdog).
+    """
+    print("--- 1. Stopping Watchdog Stack ---")
+    c.run("docker compose -p trader-watchdog -f docker-compose.watchdog.yml down")
+
+    print("\n--- 2. Stopping App Stack ---")
+    c.run("docker compose -p trader-app -f docker-compose.app.yml down")
+
+    print("\n--- 3. Stopping Infra Stack ---")
+    c.run("docker compose -p trader-infra -f docker-compose.infra.yml down")
+
+    print("\nAll stacks stopped.")

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    container_name: trader-v2-watchdog
+    restart: unless-stopped
+    command: ["python", "watchdog.py"]
+    networks:
+      - trader-net
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    env_file:
+      - .env
+
+networks:
+  trader-net:
+    external: true
