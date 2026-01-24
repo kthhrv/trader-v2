@@ -28,7 +28,13 @@ class MarketStatusService:
         """
         if "FTSE" in epic:
             return "GB"
-        elif "SPX" in epic or "US500" in epic or "NASDAQ" in epic or "WALL" in epic:
+        elif (
+            "SPX" in epic
+            or "US500" in epic
+            or "NASDAQ" in epic
+            or "WALL" in epic
+            or "SPTRD" in epic
+        ):
             return "US"
         elif "NIKKEI" in epic:
             return "JP"
