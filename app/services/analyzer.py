@@ -45,12 +45,62 @@ class MarketAnalyzer:
         context_str = self._format_context(regime, news_summary)
 
         # 4. AI Analysis
-        strategy_id = config.get("strategy_id", "momentum_breakout")
+        default_strategy = config.get("strategy_id", "momentum_breakout")
+        selected_strategy = self._determine_strategy(regime, default_strategy, config)
+
+        logger.info(
+            f"Strategy Selected: {selected_strategy} (Default: {default_strategy})"
+        )
+
         instruction = STRATEGY_PROMPTS.get(
-            strategy_id, STRATEGY_PROMPTS["momentum_breakout"]
+            selected_strategy, STRATEGY_PROMPTS["momentum_breakout"]
         )
         signal = await self.gemini.analyze_market(context_str, instruction)
         return signal
+
+    def _determine_strategy(
+        self, regime: MarketRegime, default_id: str, config: dict
+    ) -> str:
+        """
+        Selects the best strategy based on Market Regime (ADX, Volatility) and Time since open.
+        """
+        # 1. Time-Based Filter: Protect the Open
+        # If we are within 30 mins of the scheduled open, we ALWAYS use the default (Breakout/Volatility).
+        # This prevents pre-market low-vol data from falsely triggering Mean Reversion.
+        schedule = config.get("schedule")
+        market_tz = config.get("timezone", "UTC")
+
+        if schedule:
+            import pytz
+
+            now_localized = datetime.now(pytz.timezone(market_tz))
+            market_open = now_localized.replace(
+                hour=schedule["hour"],
+                minute=schedule["minute"],
+                second=0,
+                microsecond=0,
+            )
+
+            # If we are within 30 minutes AFTER the scheduled open time
+            time_since_open = (now_localized - market_open).total_seconds()
+            if 0 <= time_since_open <= 1800:
+                logger.info(
+                    f"Market Open Phase ({int(time_since_open / 60)}m since open). Forcing default strategy."
+                )
+                return default_id
+
+        # 2. Regime-Based Switching (Post-Open)
+        # ADX < 20 implies a weak trend (Choppy/Range).
+        # Volatility Ratio < 0.8 implies compression (Range).
+        adx = regime.adx_14 or 0
+        is_choppy = (adx < 20) or (regime.volatility_ratio < 0.8)
+
+        if is_choppy:
+            # In choppy markets, Breakout strategies fail. Use Mean Reversion.
+            return "mean_reversion"
+
+        # 3. Default (Trend/Breakout)
+        return default_id
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
         # Fetch Data
@@ -79,13 +129,31 @@ class MarketAnalyzer:
             df["ATR"] = ta.atr(df["high"], df["low"], df["close"], length=14)
             df["RSI"] = ta.rsi(df["close"], length=14)
             df["EMA_20"] = ta.ema(df["close"], length=20)
+
+            # ADX Calculation (Returns a DataFrame with ADX_14, DMP_14, DMN_14)
+            adx_df = ta.adx(df["high"], df["low"], df["close"], length=14)
+            if adx_df is not None and "ADX_14" in adx_df.columns:
+                df["ADX"] = adx_df["ADX_14"]
+            else:
+                df["ADX"] = 0.0
+
         except Exception as e:
             logger.error(f"Indicator calculation error: {e}")
             return None
 
         # Format Trend Table (Last 50 periods with indicators)
         # We simplify the columns to save tokens while keeping indicators
-        table_cols = ["open", "high", "low", "close", "volume", "RSI", "ATR", "EMA_20"]
+        table_cols = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "RSI",
+            "ATR",
+            "ADX",
+            "EMA_20",
+        ]
         # Ensure we only use columns that exist
         available_cols = [c for c in table_cols if c in df.columns]
         # Format index to show only HH:MM for clarity
@@ -148,6 +216,7 @@ class MarketAnalyzer:
             ema_20=ema,
             trend=trend,
             rsi_14=latest["RSI"] if pd.notna(latest["RSI"]) else 50.0,
+            adx_14=latest["ADX"] if pd.notna(latest["ADX"]) else 0.0,
             gap_percent=gap_pct,
             candles_5m=candles_5m,
             candles_1m=candles_1m,
@@ -180,6 +249,7 @@ class MarketAnalyzer:
         Price: {regime.current_price}
         Trend: {regime.trend} (EMA20: {regime.ema_20:.2f})
         RSI: {regime.rsi_14:.2f}
+        ADX: {regime.adx_14:.2f} (Strength: {"Strong" if (regime.adx_14 or 0) > 25 else "Weak"})
         ATR: {regime.atr_14:.2f} (Avg: {regime.avg_atr:.2f})
         Volatility: {regime.regime} (Ratio: {regime.volatility_ratio:.2f})
         Gap: {regime.gap_percent:+.2f}%

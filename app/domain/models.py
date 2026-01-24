@@ -41,6 +41,7 @@ class MarketRegime(BaseModel):
     ema_20: float
     trend: TrendContext
     rsi_14: float
+    adx_14: Optional[float] = None
 
     # Session
     session_high: Optional[float] = None
