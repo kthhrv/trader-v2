@@ -31,7 +31,7 @@ class Action(str, Enum):
 
 
 class EntryType(str, Enum):
-    INSTANT = "INSTANT"
+    BREAKOUT = "BREAKOUT"
 
 
 class NewsQuality(BaseModel):
@@ -45,7 +45,7 @@ class TradingSignal(BaseModel):
     ticker: str
     action: Action
     entry: float
-    entry_type: EntryType = EntryType.INSTANT
+    entry_type: EntryType = EntryType.BREAKOUT
     stop_loss: float
     take_profit: Optional[float] = None
     size: float

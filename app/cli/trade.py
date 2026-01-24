@@ -69,7 +69,7 @@ async def run_test_trade(
                 reasoning="Manual Test Trade via CLI",
                 size=0.5,  # Minimal size
                 atr=5.0,  # Dummy ATR
-                entry_type=EntryType.INSTANT,
+                entry_type=EntryType.BREAKOUT,
                 use_trailing_stop=True,
             )
 
