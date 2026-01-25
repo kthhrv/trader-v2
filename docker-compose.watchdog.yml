@@ -1,12 +1,6 @@
-version: '3.8'
-
 services:
   watchdog:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
     container_name: trader-v2-watchdog
     restart: unless-stopped
     command: ["python", "watchdog.py"]
@@ -14,7 +8,7 @@ services:
       - trader-net
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
+      - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env
 

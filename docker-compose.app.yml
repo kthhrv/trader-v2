@@ -1,12 +1,6 @@
-version: '3.8'
-
 services:
   trader:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
     container_name: trader-v2
     restart: unless-stopped
     command: ["python", "main.py", "--server", "--verbose"]
@@ -14,7 +8,7 @@ services:
       - trader-net
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
+      - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env
     environment:
@@ -23,19 +17,15 @@ services:
       - "host.docker.internal:host-gateway"
 
   watcher:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
     container_name: trader-watcher
     restart: unless-stopped
-    command: ["python", "main.py", "--watch"]
+    command: ["python", "main.py", "--watch", "--verbose"]
     networks:
       - trader-net
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
+      - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env
     environment:
@@ -44,11 +34,7 @@ services:
       - trader
 
   ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
     container_name: trader-v2-ui
     restart: unless-stopped
     working_dir: /app/dashboard
@@ -60,7 +46,7 @@ services:
       - trader-net
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
+      - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env
     depends_on:

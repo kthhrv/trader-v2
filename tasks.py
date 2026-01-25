@@ -15,10 +15,79 @@ def publish(c):
     git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
 
     print(f"Building {full_image_name} (SHA: {git_sha[:7]})...")
-    c.run(f"docker build --build-arg GIT_COMMIT_SHA={git_sha} -t {full_image_name} .")
+    # We use buildx to ensure we don't have provenance issues with V1/V2 mix
+    c.run(
+        f"docker buildx build --build-arg GIT_COMMIT_SHA={git_sha} -t {full_image_name} --push ."
+    )
 
-    print(f"Pushing {full_image_name}...")
-    c.run(f"docker push {full_image_name}")
+    print(f"Successfully pushed {full_image_name}")
+
+
+@task
+def deploy(c):
+    """
+    Deploy the 3 stacks to the production server (192.168.0.191).
+    """
+    remote_host = "192.168.0.191"
+    remote_user = "root"  # Update if different
+    base_path = "/opt/stacks"
+
+    infra_path = f"{base_path}/trader-infra"
+    app_path = f"{base_path}/trader-app"
+    watchdog_path = f"{base_path}/trader-watchdog"
+
+    print(f"--- 1. Syncing Configs to {remote_host} ---")
+    # Ensure directories exist
+    c.run(
+        f"ssh {remote_user}@{remote_host} 'mkdir -p {infra_path} {app_path} {watchdog_path} /opt/trader-v2-data'"
+    )
+
+    # Sync compose files
+    c.run(
+        f"scp docker-compose.infra.yml {remote_user}@{remote_host}:{infra_path}/compose.yaml"
+    )
+    c.run(
+        f"scp docker-compose.app.yml {remote_user}@{remote_host}:{app_path}/compose.yaml"
+    )
+    c.run(
+        f"scp docker-compose.watchdog.yml {remote_user}@{remote_host}:{watchdog_path}/compose.yaml"
+    )
+
+    # Sync Environment Variables (Crucial!)
+    print("Syncing .env...")
+    c.run(f"scp .env {remote_user}@{remote_host}:{infra_path}/.env")
+    c.run(f"scp .env {remote_user}@{remote_host}:{app_path}/.env")
+    c.run(f"scp .env {remote_user}@{remote_host}:{watchdog_path}/.env")
+
+    print("\n--- 2. Orchestrating Remote Stacks ---")
+    # Ensure Network Exists
+    c.run(f"ssh {remote_user}@{remote_host} 'docker network create trader-net || true'")
+
+    # Cleanup old containers (Migration Step)
+    print("Cleaning up potential conflicts...")
+    c.run(
+        f"ssh {remote_user}@{remote_host} 'docker rm -f trader-v2 trader-v2-ui trader-v2-watchdog trader-redis trader-streamer 2>/dev/null || true'"
+    )
+
+    # Note: We pass HOST_DATA_PATH via env on the server or in the command
+    env_vars = "HOST_DATA_PATH=/opt/trader-v2-data"
+
+    print("Restarting Infra...")
+    c.run(
+        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-infra -f {infra_path}/compose.yaml up -d --pull always --remove-orphans'"
+    )
+
+    print("Restarting App...")
+    c.run(
+        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-app -f {app_path}/compose.yaml up -d --pull always --remove-orphans'"
+    )
+
+    print("Restarting Watchdog...")
+    c.run(
+        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-watchdog -f {watchdog_path}/compose.yaml up -d --pull always --remove-orphans'"
+    )
+
+    print("\nDeployment Complete.")
 
 
 @task
