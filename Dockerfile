@@ -38,6 +38,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    RUNNING_IN_DOCKER=true \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

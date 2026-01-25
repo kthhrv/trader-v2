@@ -1,0 +1,49 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    container_name: trader-loki
+    user: "0"
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./app/core/logging/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/tmp/loki
+    networks:
+      - trader-net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: trader-promtail
+    restart: unless-stopped
+    volumes:
+      - ./app/core/logging/promtail-config.yaml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - trader-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: trader-grafana
+    restart: unless-stopped
+    ports:
+      - "3002:3000" # Use 3002 to avoid conflict with UI or other apps
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./app/core/logging/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    networks:
+      - trader-net
+    depends_on:
+      - loki
+
+networks:
+  trader-net:
+    external: true
+
+volumes:
+  loki-data:

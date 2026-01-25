@@ -1,29 +1,25 @@
 import sys
 import asyncio
+import os
 from loguru import logger
-from app.core.config import settings
 
 # Remove default handler
 logger.remove()
-
-# Add File Handler (Always DEBUG)
-logger.add(
-    settings.LOGS_DIR / "trader-v2.log",
-    rotation="10 MB",
-    retention="1 week",
-    level="DEBUG",
-    compression="zip",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-)
 
 
 def configure_logging(verbose: bool = False):
     """
     Configures the console logger level.
-    Default: WARNING (Quiet)
-    Verbose: INFO
+    In Docker: Always INFO
+    Local: INFO if verbose, else WARNING
     """
-    level = "INFO" if verbose else "WARNING"
+    # Detect Docker environment
+    is_docker = os.environ.get("RUNNING_IN_DOCKER", "false").lower() == "true"
+
+    if is_docker:
+        level = "INFO"
+    else:
+        level = "INFO" if verbose else "WARNING"
 
     logger.add(
         sys.stderr,
