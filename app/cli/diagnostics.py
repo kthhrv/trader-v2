@@ -336,32 +336,73 @@ async def run_countdown():
     """
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
+    from app.services.market_status import MarketStatusService
 
+    market_status = MarketStatusService()
     now_utc = datetime.now(ZoneInfo("UTC"))
     next_opens = []
 
     for name, cfg in MARKET_CONFIGS.items():
         schedule = cfg.get("schedule")
-        if not schedule:
+        epic = cfg.get("epic")
+        if not schedule or not epic:
             continue
-
         tz = ZoneInfo(cfg.get("timezone", "UTC"))
         now_tz = now_utc.astimezone(tz)
 
-        # Calculate next occurrence of this time
+        # Calculate next occurrence of this time today
         target = now_tz.replace(
             hour=schedule["hour"], minute=schedule["minute"], second=0, microsecond=0
         )
 
-        # If it's already passed today, or it's a weekend, find the next Mon-Fri open
-        if now_tz >= target or now_tz.weekday() >= 5:  # 5=Sat, 6=Sun
-            days_to_add = 1
-            while True:
-                candidate = target + timedelta(days=days_to_add)
-                if candidate.weekday() < 5 and candidate > now_tz:
-                    target = candidate
-                    break
-                days_to_add += 1
+        # Start checking from today (or tomorrow if time passed)
+        check_date = target
+        if now_tz >= target:
+            check_date = target + timedelta(days=1)
+
+        # Find the next valid trading day (Not Weekend, Not Holiday)
+        while True:
+            # 1. Weekend Check
+            if check_date.weekday() >= 5:  # 5=Sat, 6=Sun
+                check_date += timedelta(days=1)
+                continue
+
+            # 2. Holiday Check
+            # is_holiday expects the epic to look up the country and check that specific date
+            # We temporarily mock datetime.now inside the service? No, let's use the internal logic.
+            # Actually, MarketStatusService.is_holiday checks 'datetime.now(market_tz).date()' internally.
+            # We need a way to check a SPECIFIC date.
+            # The service doesn't expose `is_date_holiday(date, epic)`.
+            # We will refactor lightly to access the holiday check logic or instantiate the check properly.
+
+            # Since we cannot easily change MarketStatusService signature right here without a bigger refactor,
+            # we will inspect the holiday objects directly since they are public attributes of the service instance.
+            country = market_status._get_country_code(epic)
+            is_holiday_date = False
+            target_date_obj = check_date.date()
+
+            if country == "GB" and target_date_obj in market_status.uk_holidays:
+                is_holiday_date = True
+            elif country == "US" and target_date_obj in market_status.us_holidays:
+                is_holiday_date = True
+            elif country == "JP" and target_date_obj in market_status.jp_holidays:
+                is_holiday_date = True
+            elif country == "DE" and target_date_obj in market_status.de_holidays:
+                is_holiday_date = True
+            elif country == "AU" and target_date_obj in market_status.au_holidays:
+                is_holiday_date = True
+
+            # Holiday Season Check
+            if market_status._is_holiday_season(target_date_obj):
+                is_holiday_date = True
+
+            if is_holiday_date:
+                check_date += timedelta(days=1)
+                continue
+
+            # Found a valid date!
+            target = check_date
+            break
 
         next_opens.append((name, target.astimezone(ZoneInfo("UTC"))))
 
