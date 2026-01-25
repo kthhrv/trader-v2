@@ -7,7 +7,6 @@ services:
     networks:
       - trader-net
     volumes:
-      - ./logs:/app/logs
       - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env

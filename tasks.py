@@ -35,21 +35,23 @@ def up(c):
     c.run("docker network create trader-net || true")
 
     print("\n--- 2. Starting Logging Stack (Loki, Promtail, Grafana) ---")
-    c.run("docker compose -p trader-logging -f docker-compose.logging.yml up -d")
+    c.run(
+        "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml up -d"
+    )
 
     print("\n--- 3. Starting Infra Stack (Redis, Streamer) ---")
     c.run(
-        "docker compose -p trader-infra -f docker-compose.infra.yml -f docker-compose.infra.dev.yml up -d --build --remove-orphans"
+        "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml up -d --build --remove-orphans"
     )
 
     print("\n--- 4. Starting App Stack (Trader, UI, Watcher) ---")
     c.run(
-        "docker compose -p trader-app -f docker-compose.app.yml -f docker-compose.app.dev.yml up -d --build --remove-orphans"
+        "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml -f docker/docker-compose.app.dev.yml up -d --build --remove-orphans"
     )
 
     print("\n--- 5. Starting Watchdog Stack ---")
     c.run(
-        "docker compose -p trader-watchdog -f docker-compose.watchdog.yml -f docker-compose.watchdog.dev.yml up -d --build --remove-orphans"
+        "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml -f docker/docker-compose.watchdog.dev.yml up -d --build --remove-orphans"
     )
 
     print("\nAll stacks started. Use 'docker ps' to verify.")
@@ -61,16 +63,24 @@ def down(c):
     Stop and remove all 4 stacks.
     """
     print("--- 1. Stopping Watchdog Stack ---")
-    c.run("docker compose -p trader-watchdog -f docker-compose.watchdog.yml down")
+    c.run(
+        "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml down"
+    )
 
     print("\n--- 2. Stopping App Stack ---")
-    c.run("docker compose -p trader-app -f docker-compose.app.yml down")
+    c.run(
+        "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml down"
+    )
 
     print("\n--- 3. Stopping Infra Stack ---")
-    c.run("docker compose -p trader-infra -f docker-compose.infra.yml down")
+    c.run(
+        "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml down"
+    )
 
     print("\n--- 4. Stopping Logging Stack ---")
-    c.run("docker compose -p trader-logging -f docker-compose.logging.yml down")
+    c.run(
+        "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml down"
+    )
 
     print("\nAll stacks stopped.")
 
@@ -97,16 +107,16 @@ def deploy(c):
 
     # Sync compose files
     c.run(
-        f"scp docker-compose.logging.yml {remote_user}@{remote_host}:{logging_path}/compose.yaml"
+        f"scp docker/docker-compose.logging.yml {remote_user}@{remote_host}:{logging_path}/compose.yaml"
     )
     c.run(
-        f"scp docker-compose.infra.yml {remote_user}@{remote_host}:{infra_path}/compose.yaml"
+        f"scp docker/docker-compose.infra.yml {remote_user}@{remote_host}:{infra_path}/compose.yaml"
     )
     c.run(
-        f"scp docker-compose.app.yml {remote_user}@{remote_host}:{app_path}/compose.yaml"
+        f"scp docker/docker-compose.app.yml {remote_user}@{remote_host}:{app_path}/compose.yaml"
     )
     c.run(
-        f"scp docker-compose.watchdog.yml {remote_user}@{remote_host}:{watchdog_path}/compose.yaml"
+        f"scp docker/docker-compose.watchdog.yml {remote_user}@{remote_host}:{watchdog_path}/compose.yaml"
     )
 
     # Sync logging configs
