@@ -72,16 +72,15 @@ class CommandListener:
 
         try:
             reason = payload.get("reason", "manual")
-            logger.info(f"Executing Strategy for {market} (Reason: {reason})")
+            override = payload.get("override_strategy")
+
+            log_msg = f"Executing Strategy for {market} (Reason: {reason})"
+            if override:
+                log_msg += f" [Override: {override}]"
+            logger.info(log_msg)
 
             # Run the strategy (Analyst -> Execution)
-            # We assume dry_run is False unless specified in payload?
-            # Or use global config? For safety, let's respect global args passed to main,
-            # but we can't easily access argparse here.
-            # Ideally, the payload should specify execution mode.
-            # For now, we default to whatever the Engine was initialized with (which comes from main.py).
-
-            await self.engine.run_strategy(market)
+            await self.engine.run_strategy(market, override_strategy=override)
 
         except Exception as e:
             logger.error(f"Strategy execution failed for {market}: {e}")

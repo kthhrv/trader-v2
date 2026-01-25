@@ -38,6 +38,7 @@ class StrategyEngine:
         self,
         market_key: str,
         confirmation_callback: Optional[Callable[[TradingSignal], bool]] = None,
+        override_strategy: Optional[str] = None,
     ) -> StrategyResult:
         """
         Orchestrates the strategy flow: Analyze -> Validate -> Execute.
@@ -52,7 +53,9 @@ class StrategyEngine:
 
         # 1. Analyze
         try:
-            signal, signal_db = await self.generate_trade_signal(market_key)
+            signal, signal_db = await self.generate_trade_signal(
+                market_key, override_strategy
+            )
             if not signal:
                 return StrategyResult.ERROR
 
@@ -98,7 +101,7 @@ class StrategyEngine:
             return StrategyResult.ERROR
 
     async def generate_trade_signal(
-        self, market_key: str
+        self, market_key: str, override_strategy: Optional[str] = None
     ) -> tuple[Optional[TradingSignal], Optional[TradeSignal]]:
         config = MARKET_CONFIGS.get(market_key)
         if not config:
@@ -112,7 +115,9 @@ class StrategyEngine:
             return None, None
 
         logger.info(f"Generating Signal for {config['name']}...")
-        signal = await self.analyzer.analyze_market(market_key, config)
+        signal = await self.analyzer.analyze_market(
+            market_key, config, override_strategy
+        )
 
         if not signal:
             return None, None
@@ -120,7 +125,9 @@ class StrategyEngine:
         logger.info(f"AI Decision: {signal.action} | Conf: {signal.confidence}")
 
         # Save Signal
-        db_signal = await self._save_signal(signal, config["name"])
+        db_signal = await self._save_signal(
+            signal, override_strategy or config.get("strategy_id", "unknown")
+        )
 
         return signal, db_signal
 

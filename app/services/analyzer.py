@@ -23,7 +23,7 @@ class MarketAnalyzer:
         self.gemini = gemini
 
     async def analyze_market(
-        self, market_key: str, config: dict
+        self, market_key: str, config: dict, override_strategy: Optional[str] = None
     ) -> Optional[TradingSignal]:
         """
         Full analysis pipeline: Data -> Indicators -> News -> AI -> Signal.
@@ -45,12 +45,17 @@ class MarketAnalyzer:
         context_str = self._format_context(regime, news_summary)
 
         # 4. AI Analysis
-        default_strategy = config.get("strategy_id", "momentum_breakout")
-        selected_strategy = self._determine_strategy(regime, default_strategy, config)
-
-        logger.info(
-            f"Strategy Selected: {selected_strategy} (Default: {default_strategy})"
-        )
+        if override_strategy:
+            selected_strategy = override_strategy
+            logger.info(f"Strategy Override Active: {selected_strategy}")
+        else:
+            default_strategy = config.get("strategy_id", "momentum_breakout")
+            selected_strategy = self._determine_strategy(
+                regime, default_strategy, config
+            )
+            logger.info(
+                f"Strategy Selected: {selected_strategy} (Default: {default_strategy})"
+            )
 
         instruction = STRATEGY_PROMPTS.get(
             selected_strategy, STRATEGY_PROMPTS["momentum_breakout"]

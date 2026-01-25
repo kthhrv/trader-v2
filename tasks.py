@@ -145,17 +145,17 @@ def up(c):
 
     print("\n--- 2. Starting Infra Stack (Redis, Streamer) ---")
     c.run(
-        "docker compose -p trader-infra -f docker-compose.infra.yml up -d --build --remove-orphans"
+        "docker compose -p trader-infra -f docker-compose.infra.yml -f docker-compose.infra.dev.yml up -d --build --remove-orphans"
     )
 
     print("\n--- 3. Starting App Stack (Trader, UI) ---")
     c.run(
-        "docker compose -p trader-app -f docker-compose.app.yml up -d --build --remove-orphans"
+        "docker compose -p trader-app -f docker-compose.app.yml -f docker-compose.app.dev.yml up -d --build --remove-orphans"
     )
 
     print("\n--- 4. Starting Watchdog Stack ---")
     c.run(
-        "docker compose -p trader-watchdog -f docker-compose.watchdog.yml up -d --build --remove-orphans"
+        "docker compose -p trader-watchdog -f docker-compose.watchdog.yml -f docker-compose.watchdog.dev.yml up -d --build --remove-orphans"
     )
 
     print("\nAll stacks started. Use 'docker ps' to verify.")

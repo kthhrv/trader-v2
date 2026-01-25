@@ -1,0 +1,7 @@
+services:
+  watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-local-dev}

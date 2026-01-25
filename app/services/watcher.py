@@ -87,6 +87,7 @@ class PriceSensor:
                     (k for k, v in MARKET_CONFIGS.items() if v["epic"] == epic), None
                 ),
                 "reason": f"volatility_spike_{abs(change) * 100:.2f}pct",
+                "override_strategy": "volatility_response",
             }
             if payload["market"]:
                 await self.redis_client.publish("trade_commands", json.dumps(payload))
