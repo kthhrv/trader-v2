@@ -111,6 +111,27 @@ class MarketStatusService:
 
         return False
 
+    def is_market_open(self, epic: str) -> bool:
+        """
+        Checks if the market is currently open for trading (not holiday, not weekend, within hours).
+        """
+        if self.is_holiday(epic):
+            return False
+
+        schedule = self._get_market_hours(epic)
+        tz = ZoneInfo(schedule["timezone"])
+        now = datetime.now(tz)
+
+        # Weekend check
+        if now.weekday() >= 5:  # 5=Saturday, 6=Sunday
+            return False
+
+        current_time = now.time()
+        open_time = datetime.strptime(schedule["open"], "%H:%M").time()
+        close_time = datetime.strptime(schedule["close"], "%H:%M").time()
+
+        return open_time <= current_time <= close_time
+
     def _is_holiday_season(self, d: date) -> bool:
         """
         Checks if the date falls within the low-liquidity holiday season (Dec 20 - Jan 4).

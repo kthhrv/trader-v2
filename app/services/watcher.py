@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.logger import logger
 from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
+from app.services.market_status import MarketStatusService
 
 
 class PriceSensor:
@@ -25,6 +26,7 @@ class PriceSensor:
         self.threshold = 0.0015  # 0.15% spike threshold (Configurable)
         self.cooldowns: Dict[str, datetime] = {}
         self.cooldown_seconds = 300  # 5 minutes between alerts per market
+        self.market_status = MarketStatusService()
 
     async def on_tick(self, data: dict):
         epic = data.get("epic")
@@ -59,6 +61,11 @@ class PriceSensor:
             await self._trigger_alert(epic, pct_change, bid)
 
     async def _trigger_alert(self, epic: str, change: float, current_price: float):
+        # 0. Check Market Status
+        if not self.market_status.is_market_open(epic):
+            logger.debug(f"Ignored spike for {epic} (Market Closed/Holiday)")
+            return
+
         now = datetime.now(timezone.utc)
         last_alert = self.cooldowns.get(epic)
 

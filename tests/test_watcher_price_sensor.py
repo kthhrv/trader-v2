@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timedelta, timezone
 from app.services.watcher import PriceSensor
 
@@ -8,6 +8,8 @@ from app.services.watcher import PriceSensor
 async def test_price_sensor_window_logic():
     """Test that the sliding window maintains size correctly."""
     sensor = PriceSensor(AsyncMock())
+    sensor.market_status = MagicMock()
+    sensor.market_status.is_market_open.return_value = True
     sensor.window_seconds = 10
 
     epic = "TEST.EPIC"
@@ -35,6 +37,8 @@ async def test_price_sensor_spike_detection():
     """Test detection of significant price moves."""
     notifier = AsyncMock()
     sensor = PriceSensor(notifier)
+    sensor.market_status = MagicMock()
+    sensor.market_status.is_market_open.return_value = True
     sensor.threshold = 0.005  # 0.5%
     epic = "TEST.EPIC"
 
@@ -56,6 +60,8 @@ async def test_price_sensor_cooldown():
     """Test that alerts are throttled."""
     notifier = AsyncMock()
     sensor = PriceSensor(notifier)
+    sensor.market_status = MagicMock()
+    sensor.market_status.is_market_open.return_value = True
     sensor.threshold = 0.001
     sensor.cooldown_seconds = 60
     epic = "TEST.EPIC"
