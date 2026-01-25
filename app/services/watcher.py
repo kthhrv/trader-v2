@@ -97,8 +97,10 @@ class PriceSensor:
                 "override_strategy": "volatility_response",
             }
             if payload["market"]:
-                await self.redis_client.publish("trade_commands", json.dumps(payload))
-                logger.info(f"Triggered Strategy for {payload['market']}")
+                # await self.redis_client.publish("trade_commands", json.dumps(payload))
+                logger.info(
+                    f"DRY RUN: Would have triggered Strategy for {payload['market']}"
+                )
 
         # 2. Send HA Notification (Background/Secondary)
         await self.notifier.send_notification(title, message, priority="high")
