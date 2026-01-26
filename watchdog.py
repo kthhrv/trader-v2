@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import redis.asyncio as redis
-from app.core.logger import logger
+from app.core.logger import logger, configure_logging
 from app.core.config import settings
 from app.adapters.notification import HomeAssistantNotifier
 
@@ -34,7 +34,7 @@ async def check_liveness():
                 decode_responses=True,
             )
             content = await r.get(REDIS_KEY)
-            await r.close()
+            await r.aclose()
 
             if not content:
                 logger.warning(f"Heartbeat key {REDIS_KEY} missing!")
@@ -86,6 +86,7 @@ async def check_liveness():
 
 if __name__ == "__main__":
     try:
+        configure_logging(verbose=True)
         asyncio.run(check_liveness())
     except KeyboardInterrupt:
         pass
