@@ -120,9 +120,18 @@ def deploy(c):
     )
 
     # Sync logging configs
-    c.run(f"ssh {remote_user}@{remote_host} 'mkdir -p {logging_path}/app/core/logging'")
+    # The compose file expects ./docker/logging/... relative to itself
+    # We are placing compose.yaml in {logging_path}, so we need {logging_path}/docker/logging
+    remote_logging_conf_dir = f"{logging_path}/docker/logging"
+    c.run(f"ssh {remote_user}@{remote_host} 'mkdir -p {remote_logging_conf_dir}'")
+
+    # Copy all yaml config files
     c.run(
-        f"scp app/core/logging/*.yaml {remote_user}@{remote_host}:{logging_path}/app/core/logging/"
+        f"scp docker/logging/*.yaml {remote_user}@{remote_host}:{remote_logging_conf_dir}/"
+    )
+    # Copy dashboards directory recursively
+    c.run(
+        f"scp -r docker/logging/dashboards {remote_user}@{remote_host}:{remote_logging_conf_dir}/"
     )
 
     # Sync Environment Variables (Crucial!)
