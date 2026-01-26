@@ -1,11 +1,12 @@
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 import reflex as rx
 import plotly.graph_objects as go
 import pandas as pd
+import redis.asyncio as redis
 from dotenv import load_dotenv
 
 # Add project root to sys.path
@@ -20,6 +21,7 @@ load_dotenv(project_root / ".env")
 from app.services.scorecard import ScorecardService  # noqa: E402
 from app.database.queries import get_recent_signals_with_executions, delete_signal_record, get_trade_candles  # noqa: E402
 from app.core.markets import MARKET_CONFIGS  # noqa: E402
+from app.core.config import settings  # noqa: E402
 # fmt: on
 
 
@@ -265,28 +267,45 @@ class State(rx.State):
             print(f"Error building graph: {e}")
             return go.Figure()
 
-    def check_heartbeat(self):
-        """Checks the heartbeat file for bot status."""
-        heartbeat_path = project_root / "data/heartbeat.txt"
-        if heartbeat_path.exists():
-            mtime = datetime.fromtimestamp(heartbeat_path.stat().st_mtime)
-            self.last_heartbeat = mtime.strftime("%H:%M:%S")
+    async def check_heartbeat(self):
+        """Checks the Redis heartbeat key for bot status."""
+        try:
+            r = redis.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                decode_responses=True,
+            )
+            content = await r.get("health:app:last_seen")
+            await r.aclose()
 
-            if (datetime.now() - mtime).total_seconds() < 120:
-                self.bot_status = "ONLINE"
-                self.bot_status_color = "green"
+            if content:
+                last_hb = datetime.fromisoformat(content)
+                # Normalize to aware UTC if naive
+                if not last_hb.tzinfo:
+                    last_hb = last_hb.replace(tzinfo=timezone.utc)
+
+                now = datetime.now(timezone.utc)
+                self.last_heartbeat = last_hb.strftime("%H:%M:%S")
+
+                if (now - last_hb).total_seconds() < 120:
+                    self.bot_status = "ONLINE"
+                    self.bot_status_color = "green"
+                else:
+                    self.bot_status = "OFFLINE"
+                    self.bot_status_color = "red"
             else:
-                self.bot_status = "OFFLINE"
-                self.bot_status_color = "red"
-        else:
-            self.bot_status = "NO SIGNAL"
-            self.bot_status_color = "gray"
+                self.bot_status = "NO SIGNAL"
+                self.bot_status_color = "gray"
+        except Exception as e:
+            print(f"Heartbeat check failed: {e}")
+            self.bot_status = "ERROR"
+            self.bot_status_color = "red"
 
     async def load_data(self):
         self.is_loading = True
 
         # Update Heartbeat
-        self.check_heartbeat()
+        await self.check_heartbeat()
 
         stats = await ScorecardService.get_scorecard_data()
         if stats:
