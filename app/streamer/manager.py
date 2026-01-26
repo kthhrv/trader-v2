@@ -144,16 +144,7 @@ class StreamManager:
                 line_str = line.decode().strip()
                 if not line_str:
                     continue
-                if "[NODE_STREAM_INFO]" in line_str:
-                    continue
-                try:
-                    data = json.loads(line_str)
-                    if data.get("type") == "price_update":
-                        await self.redis.publish("market_data", json.dumps(data))
-                        if data.get("bid"):
-                            await self.candle_builder.on_tick(epic, float(data["bid"]))
-                except json.JSONDecodeError:
-                    pass
+                await self._process_stream_line(line_str, epic)
 
         stdout_task = asyncio.create_task(read_stdout(process.stdout))
 
@@ -168,6 +159,30 @@ class StreamManager:
                 process.terminate()
             except Exception:
                 pass
+
+    async def _process_stream_line(self, line_str: str, epic: str):
+        if "[NODE_STREAM_INFO]" in line_str:
+            return
+        try:
+            data = json.loads(line_str)
+            if data.get("type") == "price_update":
+                bid = float(data.get("bid", 0))
+                offer = float(data.get("offer", 0))
+
+                # Sanity Check: Filter out unrealistic values (e.g. overflow/sentinels)
+                # Max reasonable price for indices/forex is < 1,000,000
+                # Min reasonable price is > 0
+                if not (0 < bid < 1_000_000) or not (0 < offer < 1_000_000):
+                    logger.warning(
+                        f"Ignored insane price for {epic}: Bid={bid}, Offer={offer}"
+                    )
+                    return
+
+                await self.redis.publish("market_data", json.dumps(data))
+                if data.get("bid"):
+                    await self.candle_builder.on_tick(epic, bid)
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.debug(f"Failed to parse stream line: {e}")
 
     async def _stop_process(self):
         # Todo: Kill all subprocesses

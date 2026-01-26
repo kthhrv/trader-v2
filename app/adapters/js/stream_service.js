@@ -52,17 +52,24 @@ const priceSub = new ls.Subscription("MERGE", [`L1:${epic}`], ["BID", "OFFER", "
 
 priceSub.addListener({
   onItemUpdate: function(update) {
-    const bid = update.getValue("BID");
-    const offer = update.getValue("OFFER");
+    const bidRaw = update.getValue("BID");
+    const offerRaw = update.getValue("OFFER");
     const update_time = update.getValue("UPDATE_TIME");
     const market_state = update.getValue("MARKET_STATE");
 
-    if (bid && offer) { // Only log if we have valid price data
+    if (bidRaw && offerRaw) {
+        const bid = parseFloat(bidRaw);
+        const offer = parseFloat(offerRaw);
+
+        if (bid <= 0 || offer <= 0) {
+            log_error(`Invalid Price Detected! Raw BID: "${bidRaw}", Raw OFFER: "${offerRaw}", Epic: ${epic}`);
+        }
+
         log_data({
             type: "price_update",
             epic: epic,
-            bid: parseFloat(bid),
-            offer: parseFloat(offer),
+            bid: bid,
+            offer: offer,
             time: update_time,
             market_state: market_state
         });
