@@ -45,23 +45,30 @@ class RiskManager:
                 )
                 max_risk_amount = allowed_loss
 
-        # Trade Risk = Size * Distance
         # Distance = |Entry - Stop|
         distance = abs(signal.entry - signal.stop_loss)
         if distance == 0:
             logger.error("Invalid Stop Loss: Distance is 0")
             return False
 
-        trade_risk = signal.size * distance
+        # Calculate Target Size based on Risk Rule
+        target_size = max_risk_amount / distance
+        # Round down to 2 decimal places
+        target_size = int(target_size * 100) / 100.0
 
         logger.info(
-            f"Validation: Balance={balance:.2f}, MaxRisk={max_risk_amount:.2f}, TradeRisk={trade_risk:.2f}"
+            f"Risk Check: Balance={balance:.2f}, MaxRisk={max_risk_amount:.2f}, Distance={distance:.2f}, TargetSize={target_size}"
         )
 
-        if trade_risk > max_risk_amount:
+        if target_size < 0.5:
             logger.error(
-                f"Risk Violation: Trade Risk ({trade_risk:.2f}) > Max Risk ({max_risk_amount:.2f}). Rejecting trade."
+                f"Risk Violation: Calculated size {target_size} is below broker minimum (0.5). Stop distance might be too wide."
             )
             return False
+
+        # Override signal size with risk-adjusted size
+        if signal.size != target_size:
+            logger.info(f"Resizing trade: {signal.size} -> {target_size}")
+            signal.size = target_size
 
         return True
