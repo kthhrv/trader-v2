@@ -1,5 +1,6 @@
 import asyncio
 import json
+import socket
 from collections import deque
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -118,32 +119,50 @@ class WatcherService:
 
     async def start(self):
         """
-        Main loop listening to Redis.
+        Main loop listening to Redis with automatic reconnection.
         """
         logger.info("WatcherService starting...")
-        self.redis_client = redis.Redis(
-            host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True
-        )
-        # Give sensor access to publisher
-        self.price_sensor.redis_client = self.redis_client
 
-        pubsub = self.redis_client.pubsub()
-        await pubsub.subscribe("market_data")
+        while True:
+            try:
+                self.redis_client = redis.Redis(
+                    host=settings.REDIS_HOST,
+                    port=settings.REDIS_PORT,
+                    decode_responses=True,
+                )
+                # Give sensor access to publisher for strategy triggers
+                self.price_sensor.redis_client = self.redis_client
 
-        logger.info(
-            f"Watcher listening to Redis 'market_data' on {settings.REDIS_HOST}"
-        )
+                pubsub = self.redis_client.pubsub()
+                await pubsub.subscribe("market_data")
 
-        try:
-            async for message in pubsub.listen():
-                if message["type"] == "message":
+                logger.info(
+                    f"Watcher listening to Redis 'market_data' on {settings.REDIS_HOST}"
+                )
+
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        try:
+                            data = json.loads(message["data"])
+                            await self.price_sensor.on_tick(data)
+                        except json.JSONDecodeError:
+                            continue
+
+            except (redis.ConnectionError, socket.gaierror) as e:
+                logger.warning(
+                    f"Watcher lost Redis connection ({e}). Retrying in 5s..."
+                )
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                logger.info("WatcherService shutting down...")
+                break
+            except Exception as e:
+                logger.exception(f"WatcherService unexpected error: {e}")
+                await asyncio.sleep(5)
+            finally:
+                if self.redis_client:
                     try:
-                        data = json.loads(message["data"])
-                        await self.price_sensor.on_tick(data)
-                    except json.JSONDecodeError:
-                        continue
-        except asyncio.CancelledError:
-            logger.info("WatcherService shutting down...")
-        finally:
-            await pubsub.unsubscribe("market_data")
-            await self.redis_client.close()
+                        # Close the client and connection
+                        await self.redis_client.close()
+                    except Exception:
+                        pass
