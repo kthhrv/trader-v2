@@ -25,8 +25,8 @@ async def test_candle_builder_aggregation():
             await builder.on_tick(epic, 100.0)
 
         assert epic in builder.state
-        assert builder.state[epic]["1Min"]["open"] == 100.0
-        assert builder.state[epic]["5Min"]["open"] == 100.0
+        assert builder.state[epic]["MINUTE"]["open"] == 100.0
+        assert builder.state[epic]["MINUTE_5"]["open"] == 100.0
 
         # 2. Second Tick (Update same buckets)
         t2 = datetime(2023, 1, 1, 10, 0, 30, tzinfo=timezone.utc)
@@ -34,8 +34,8 @@ async def test_candle_builder_aggregation():
             mock_dt.now.return_value = t2
             await builder.on_tick(epic, 105.0)
 
-        assert builder.state[epic]["1Min"]["high"] == 105.0
-        assert builder.state[epic]["1Min"]["volume"] == 2
+        assert builder.state[epic]["MINUTE"]["high"] == 105.0
+        assert builder.state[epic]["MINUTE"]["volume"] == 2
 
         # 3. Third Tick (New 1m bucket, should flush old 1m)
         t3 = datetime(2023, 1, 1, 10, 1, 5, tzinfo=timezone.utc)
@@ -46,7 +46,7 @@ async def test_candle_builder_aggregation():
         # Check if save was called for 1m candle (from 10:00)
         assert mock_session.add.called
         saved_candle = mock_session.add.call_args[0][0]
-        assert saved_candle.resolution == "1Min"
+        assert saved_candle.resolution == "MINUTE"
         assert saved_candle.timestamp == datetime(
             2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc
         )
@@ -66,5 +66,5 @@ async def test_candle_builder_aggregation():
         resolutions = [
             call[0][0].resolution for call in mock_session.add.call_args_list
         ]
-        assert "5Min" in resolutions
-        assert "1Min" in resolutions
+        assert "MINUTE_5" in resolutions
+        assert "MINUTE" in resolutions

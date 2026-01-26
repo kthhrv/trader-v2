@@ -106,7 +106,7 @@ async def seed_data():
 
                     hc = HistoricalCandle(
                         symbol=config["epic"],
-                        resolution="1Min",
+                        resolution="MINUTE",
                         timestamp=curr_time,
                         open=open_p,
                         high=high_p,

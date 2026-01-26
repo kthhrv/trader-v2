@@ -19,7 +19,7 @@ async def test_market_data_uses_cached_if_fresh():
     async with db_session.async_session_maker() as session:
         c1 = HistoricalCandle(
             symbol=epic,
-            resolution="MIN",
+            resolution="MINUTE",
             timestamp=now - timedelta(seconds=30),
             open=100,
             high=100,
@@ -38,7 +38,7 @@ async def test_market_data_uses_cached_if_fresh():
     service = MarketDataService(mock_ig, mock_collector)
 
     # Call
-    candles = await service.get_latest_candles(epic, "MIN", 1)
+    candles = await service.get_latest_candles(epic, "MINUTE", 1)
 
     # Assert
     assert len(candles) == 1
@@ -60,7 +60,7 @@ async def test_market_data_delta_fetch_if_stale():
     async with db_session.async_session_maker() as session:
         c1 = HistoricalCandle(
             symbol=epic,
-            resolution="MIN",
+            resolution="MINUTE",
             timestamp=stale_time,
             open=100,
             high=100,
@@ -81,7 +81,7 @@ async def test_market_data_delta_fetch_if_stale():
     # Call
     # num_points = 1. Gap is 2 hours (120 mins).
     # 120 > (1 * 1.5), so it should switch to FULL fetch.
-    await service.get_latest_candles(epic, "MIN", 1)
+    await service.get_latest_candles(epic, "MINUTE", 1)
 
     # Assert Full Fetch Called instead of Delta
     mock_collector.collect_market_data.assert_called_once()

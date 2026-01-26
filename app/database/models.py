@@ -112,7 +112,7 @@ class HistoricalCandle(SQLModel, table=True):
     __tablename__ = "historical_candles"
 
     symbol: str = Field(primary_key=True, index=True)
-    resolution: str = Field(primary_key=True)  # 1Min, 5Min, 15Min, 1H, 1D
+    resolution: str = Field(primary_key=True)  # MINUTE, MINUTE_5, MINUTE_15, HOUR
     timestamp: datetime = Field(
         sa_column=Column(DateTime(timezone=True), primary_key=True),
     )

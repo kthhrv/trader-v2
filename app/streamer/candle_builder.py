@@ -23,9 +23,9 @@ class CandleBuilder:
         if epic not in self.state:
             self.state[epic] = {}
 
-        await self._process_timeframe(epic, bid, minute_floor, "1Min", 1)
-        await self._process_timeframe(epic, bid, minute_floor, "5Min", 5)
-        await self._process_timeframe(epic, bid, minute_floor, "15Min", 15)
+        await self._process_timeframe(epic, bid, minute_floor, "MINUTE", 1)
+        await self._process_timeframe(epic, bid, minute_floor, "MINUTE_5", 5)
+        await self._process_timeframe(epic, bid, minute_floor, "MINUTE_15", 15)
 
     async def _process_timeframe(
         self, epic: str, bid: float, now: datetime, resolution: str, interval_mins: int

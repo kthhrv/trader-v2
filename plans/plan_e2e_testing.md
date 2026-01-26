@@ -10,9 +10,9 @@
 - **Validation:** Redis message receipt.
 
 ### 2. The "Recorder" Test (Candle Aggregation)
-- **Goal:** Prove `market-streamer` is writing to SQLite.
+- **Goal:** Prove `market-streamer` is writing to Postgres/TimescaleDB.
 - **Method:** Inject 60s of synthetic ticks. Wait 65s.
-- **Validation:** Query `historical_candles`. Assert `resolution='1Min'` row exists for the test epic.
+- **Validation:** Query `historical_candles`. Assert `resolution='MINUTE'` row exists for the test epic.
 
 ### 3. The "Reflex" Test (Watcher -> Trader)
 - **Goal:** Prove a volatility spike triggers a strategy run.
