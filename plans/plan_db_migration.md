@@ -24,22 +24,33 @@
 ## Implementation Steps
 
 ### Phase 1: Preparation & Dependencies
-1. [ ] Create the database and user on the external Postgres server.
-2. [ ] Add `asyncpg` and `psycopg2-binary` to the project dependencies.
-3. [ ] Update `app/core/config.py` with the new database settings.
+1. [x] **Production:** Create a dedicated user (`trader`) and database (`trader2`) on the external Postgres server.
+2. [x] **Local Dev:** Update `docker/docker-compose.infra.dev.yml` to include a `timescale/timescaledb:latest-pg18` container.
+3. [x] Add `asyncpg` and `psycopg2-binary` to the project dependencies.
+4. [x] Update `app/core/config.py` with the new database settings (`POSTGRES_USER`, `POSTGRES_HOST`, etc.).
+5. [x] **WAIT FOR CONFIRMATION**
 
-### Phase 2: Code Refactor
-4. [ ] Update `app/database/session.py`:
+### Phase 2: Code & Config Refactor
+6. [x] Update `app/database/session.py`:
     - Switch from `sqlite+aiosqlite` to `postgresql+asyncpg`.
     - Remove SQLite-specific logic (WAL pragmas).
-5. [ ] Update `init_db()` to support Postgres schema initialization.
+7. [x] Update `init_db()` to:
+    - Support Postgres schema initialization.
+    - **Execute TimescaleDB setup:** Run `SELECT create_hypertable(...)` for `historical_candles` immediately after table creation.
+8. [x] Update Docker Compose files (`docker/docker-compose.*.yml`):
+    - **Remove** the `HOST_DATA_PATH` volume mount (data is now over the network).
+    - **Add** environment variables for Postgres connection.
+9. [x] **WAIT FOR CONFIRMATION**
 
-### Phase 3: Data Migration (Optional)
-6. [ ] Create a script to migrate existing `trade_signals` and `trade_executions` from SQLite to Postgres.
-7. [ ] *Note:* Historical candles can be rebuilt by the 24/7 streamer if history is not critical.
+### Phase 3: Data Migration (Skipped)
+- **Status:** Not Required for V2 Alpha.
+- **Action:** System will start with an empty database. New history will be built by the streamer.
+10. [x] **WAIT FOR CONFIRMATION**
 
-### Phase 4: TimescaleDB Optimization
-8. [ ] Execute SQL to convert `historical_candles` into a **Hypertable** for optimal performance.
+### Phase 4: Verification
+11. [ ] Deploy to production and verify connection.
+12. [ ] Confirm `historical_candles` is a hypertable via SQL query.
+13. [ ] **WAIT FOR CONFIRMATION**
 
 ## Success Criteria
 - Bot successfully connects to the external Postgres database from all containers.

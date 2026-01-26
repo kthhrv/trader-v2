@@ -1,7 +1,27 @@
 services:
+  db:
+    image: timescale/timescaledb:latest-pg18
+    container_name: trader-db
+    environment:
+      - POSTGRES_DB=trader2
+      - POSTGRES_USER=trader
+      - POSTGRES_PASSWORD=trader_pass
+    ports:
+      - "5432:5432"
+    networks:
+      - trader-net
+    volumes:
+      - trader-db-data:/var/lib/postgresql/data
+
   market-streamer:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-local-dev}
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=trader_pass
+
+volumes:
+  trader-db-data:

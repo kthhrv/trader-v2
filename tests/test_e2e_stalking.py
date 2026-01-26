@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.cli.trade import run_market_strategy
 from app.adapters.gemini_service import TradingSignal, Action, EntryType
 
@@ -49,9 +49,10 @@ async def test_e2e_stalking_flow():
     mock_ig.fetch_open_positions.return_value = {"positions": []}
 
     # Mock Candles to pass _build_market_regime
-    def make_candle(price):
+    def make_candle(price, time_offset_min=0):
+        t = datetime.now() - timedelta(minutes=time_offset_min)
         return {
-            "snapshotTime": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+            "snapshotTime": t.strftime("%Y/%m/%d %H:%M:%S"),
             "openPrice": {"bid": price, "ask": price},
             "highPrice": {"bid": price + 10, "ask": price + 10},
             "lowPrice": {"bid": price - 10, "ask": price - 10},
@@ -59,7 +60,8 @@ async def test_e2e_stalking_flow():
             "lastTradedVolume": 100,
         }
 
-    prices_data = {"prices": [make_candle(4000) for _ in range(50)]}
+    prices_data = {"prices": [make_candle(4000, i * 15) for i in range(50)]}
+
     mock_ig.fetch_historical_prices = AsyncMock(return_value=prices_data)
     mock_ig.fetch_client_sentiment_by_instrument = AsyncMock(
         return_value={"longPositionPercentage": 50}
@@ -85,17 +87,6 @@ async def test_e2e_stalking_flow():
     mock_news.fetch_news = AsyncMock(return_value="Market is volatile.")
 
     # 3. Patching
-    # We Patch:
-    # - IGClient (Class used in type hints/imports? No, we patch the instance getter in CLI)
-    # - GeminiService (To inject our mock analyst)
-    # - StreamerService (To inject our mock streamer)
-    # - MarketStatusService (To avoid real date checks)
-    # - NewsClient (To avoid real HTTP calls)
-
-    # We DO NOT Patch:
-    # - CollectorService (We want real logic)
-    # - MarketDataService (We want real logic)
-
     with (
         patch("app.core.container.GeminiService", return_value=mock_gemini),
         patch("app.core.container.StreamerService", return_value=mock_streamer),
@@ -119,4 +110,5 @@ async def test_e2e_stalking_flow():
 
             args, kwargs = mock_ig.create_order.call_args
             assert kwargs["direction"] == "BUY"
+            # In Container, spx -> IX.D.SPTRD.DAILY.IP
             assert kwargs["epic"] == "IX.D.SPTRD.DAILY.IP"

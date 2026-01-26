@@ -64,17 +64,17 @@ def down(c):
     """
     print("--- 1. Stopping Watchdog Stack ---")
     c.run(
-        "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml down"
+        "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml -f docker/docker-compose.watchdog.dev.yml down"
     )
 
     print("\n--- 2. Stopping App Stack ---")
     c.run(
-        "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml down"
+        "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml -f docker/docker-compose.app.dev.yml down"
     )
 
     print("\n--- 3. Stopping Infra Stack ---")
     c.run(
-        "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml down"
+        "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml down"
     )
 
     print("\n--- 4. Stopping Logging Stack ---")
@@ -83,6 +83,31 @@ def down(c):
     )
 
     print("\nAll stacks stopped.")
+
+
+@task
+def restart(c, stack="all"):
+    """
+    Restart specific stack(s): app, infra, logging, watchdog, or all.
+    """
+    stacks = {
+        "watchdog": "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml -f docker/docker-compose.watchdog.dev.yml restart",
+        "app": "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml -f docker/docker-compose.app.dev.yml restart",
+        "infra": "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml restart",
+        "logging": "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml restart",
+    }
+
+    if stack == "all":
+        for name, cmd in stacks.items():
+            print(f"--- Restarting {name} ---")
+            c.run(cmd)
+    elif stack in stacks:
+        print(f"--- Restarting {stack} ---")
+        c.run(stacks[stack])
+    else:
+        print(
+            f"Error: Unknown stack '{stack}'. Valid options: {list(stacks.keys()) + ['all']}"
+        )
 
 
 @task

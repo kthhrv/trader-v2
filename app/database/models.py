@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import Field, SQLModel, Relationship
+from sqlalchemy import Column, DateTime
 
 
 class TradeSignal(SQLModel, table=True):
@@ -11,7 +12,10 @@ class TradeSignal(SQLModel, table=True):
     __tablename__ = "trade_signals"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
     # Context
     symbol: str = Field(index=True)
@@ -52,7 +56,10 @@ class TradeExecution(SQLModel, table=True):
 
     # Execution Details
     fill_price: float
-    fill_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    fill_time: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
     size: float
 
     # Management
@@ -61,7 +68,9 @@ class TradeExecution(SQLModel, table=True):
 
     # Outcome
     exit_price: Optional[float] = None
-    exit_time: Optional[datetime] = None
+    exit_time: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True))
+    )
     pnl: Optional[float] = None
     outcome_status: str = "OPEN"  # OPEN, WIN, LOSS, BREAKEVEN
 
@@ -79,7 +88,10 @@ class TradePostMortem(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     execution_id: int = Field(foreign_key="trade_executions.id")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
     did_follow_plan: bool
     stop_loss_critique: str
@@ -99,10 +111,11 @@ class HistoricalCandle(SQLModel, table=True):
 
     __tablename__ = "historical_candles"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    symbol: str = Field(index=True)
-    resolution: str  # 1Min, 5Min, 15Min, 1H, 1D
-    timestamp: datetime = Field(index=True)
+    symbol: str = Field(primary_key=True, index=True)
+    resolution: str = Field(primary_key=True)  # 1Min, 5Min, 15Min, 1H, 1D
+    timestamp: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), primary_key=True),
+    )
 
     open: float
     high: float

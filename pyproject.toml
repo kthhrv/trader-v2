@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiosqlite>=0.22.1",
     "apscheduler>=3.11.2",
     "coverage>=7.13.1",
     "feedparser>=6.0.12",
@@ -26,10 +25,13 @@ dependencies = [
     "matplotlib>=3.10.0",
     "reflex>=0.8.26",
     "redis>=7.1.0",
+    "asyncpg>=0.31.0",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.22.1",
     "invoke>=2.2.1",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",

@@ -7,15 +7,21 @@ from sqlmodel import SQLModel
 
 from app.core.config import settings
 
-# Create Async Engine
-# Note: SQLite requires 3 slashes for relative path, 4 for absolute.
-# settings.DB_PATH is absolute, so we use sqlite+aiosqlite:///
-DATABASE_URL = f"sqlite+aiosqlite:///{settings.DB_PATH}"
+# Create Async Engine for PostgreSQL
+# postgresql+asyncpg://user:password@host:port/dbname
+DATABASE_URL = (
+    f"postgresql+asyncpg://{settings.POSTGRES_USER}:"
+    f"{settings.POSTGRES_PASSWORD.get_secret_value()}@"
+    f"{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/"
+    f"{settings.POSTGRES_DB}"
+)
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL query logging
     future=True,
+    pool_size=20,
+    max_overflow=10,
 )
 
 async_session_maker = sessionmaker(
@@ -25,13 +31,27 @@ async_session_maker = sessionmaker(
 
 async def init_db():
     """
-    Initializes the database by creating all tables and enabling WAL mode.
+    Initializes the database by creating tables and setting up TimescaleDB hypertables.
     """
+    import app.database.models  # noqa: F401
+
     async with engine.begin() as conn:
-        # Enable WAL mode for concurrent access
-        await conn.execute(text("PRAGMA journal_mode=WAL;"))
-        # await conn.run_sync(SQLModel.metadata.drop_all)
+        # 1. Create all tables defined in models.py
         await conn.run_sync(SQLModel.metadata.create_all)
+
+        # 2. Enable TimescaleDB Hypertables for time-series data
+        # Note: This is idempotent using 'if_not_exists => TRUE'
+        try:
+            await conn.execute(
+                text(
+                    "SELECT create_hypertable('historical_candles', 'timestamp', if_not_exists => TRUE);"
+                )
+            )
+        except Exception as e:
+            # If extension is not installed or other PG error, we log but don't crash init
+            from app.core.logger import logger
+
+            logger.warning(f"TimescaleDB hypertable setup skipped/failed: {e}")
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
+    # --- Database (PostgreSQL/TimescaleDB) ---
+    POSTGRES_USER: str = "trader"
+    POSTGRES_PASSWORD: SecretStr = SecretStr("trader_pass")
+    POSTGRES_HOST: str = "localhost"  # Default for local dev, overridden in Docker
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "trader2"
+
     HA_API_URL: str = "http://192.168.0.207:8123"
     HA_ACCESS_TOKEN: Optional[SecretStr] = None
     HA_NOTIFY_ENTITY: str = "notify.mobile_app_pixel_8"

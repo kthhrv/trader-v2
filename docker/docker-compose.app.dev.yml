@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
       args:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-local-dev}
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=trader_pass
 
   watcher:
     build:
@@ -12,6 +15,9 @@ services:
       dockerfile: Dockerfile
       args:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-local-dev}
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=trader_pass
 
   ui:
     build:
@@ -19,3 +25,6 @@ services:
       dockerfile: Dockerfile
       args:
         GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-local-dev}
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=trader_pass
