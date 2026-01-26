@@ -73,12 +73,16 @@ async def test_market_data_delta_fetch_if_stale():
     # Mocks
     mock_ig = MagicMock()
     mock_collector = MagicMock()
+    mock_collector.collect_market_data = AsyncMock()
     mock_collector.collect_market_data_range = AsyncMock()
 
     service = MarketDataService(mock_ig, mock_collector)
 
     # Call
+    # num_points = 1. Gap is 2 hours (120 mins).
+    # 120 > (1 * 1.5), so it should switch to FULL fetch.
     await service.get_latest_candles(epic, "MIN", 1)
 
-    # Assert Delta Fetch Called
-    mock_collector.collect_market_data_range.assert_called_once()
+    # Assert Full Fetch Called instead of Delta
+    mock_collector.collect_market_data.assert_called_once()
+    mock_collector.collect_market_data_range.assert_not_called()

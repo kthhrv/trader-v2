@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 from app.services.executor import TradeExecutor
 
 
@@ -36,31 +37,25 @@ async def test_executor_breakeven_trigger(mock_deps):
     ) + timedelta(hours=5)
 
     executor = TradeExecutor(mock_client, mock_streamer, mock_status)
+    executor._update_execution_stop = cast(Any, AsyncMock())
+    executor._is_position_open = cast(Any, AsyncMock(return_value=True))
 
-    with patch.object(executor, "_update_execution_stop", new_callable=AsyncMock):
-        with patch.object(
-            executor, "_is_position_open", new_callable=AsyncMock
-        ) as mock_is_open:
-            mock_is_open.return_value = True
+    import itertools
 
-            import itertools
+    ts = datetime.now(timezone.utc).timestamp()
+    with patch("app.services.executor.datetime") as mock_dt:
+        mock_dt.now.return_value.timestamp.side_effect = itertools.count(ts, 10.0)
+        mock_dt.now.return_value.tzinfo = timezone.utc
 
-            ts = datetime.now(timezone.utc).timestamp()
-            with patch("app.services.executor.datetime") as mock_dt:
-                mock_dt.now.return_value.timestamp.side_effect = itertools.count(
-                    ts, 10.0
-                )
-                mock_dt.now.return_value.tzinfo = timezone.utc
-
-                await executor._monitor_position(
-                    deal_id="DEAL123",
-                    epic="TEST",
-                    direction="BUY",
-                    entry_price=entry_price,
-                    current_stop=initial_stop,
-                    atr=atr,
-                    size=1.0,
-                )
+        await executor._monitor_position(
+            deal_id="DEAL123",
+            epic="TEST",
+            direction="BUY",
+            entry_price=entry_price,
+            current_stop=initial_stop,
+            atr=atr,
+            size=1.0,
+        )
 
     # Verify Update called at least once
     assert mock_client.update_open_position.call_count >= 1
@@ -86,31 +81,25 @@ async def test_executor_trailing_stop(mock_deps):
     ) + timedelta(hours=5)
 
     executor = TradeExecutor(mock_client, mock_streamer, mock_status)
+    executor._update_execution_stop = cast(Any, AsyncMock())
+    executor._is_position_open = cast(Any, AsyncMock(return_value=True))
 
-    with patch.object(executor, "_update_execution_stop", new_callable=AsyncMock):
-        with patch.object(
-            executor, "_is_position_open", new_callable=AsyncMock
-        ) as mock_is_open:
-            with patch("app.services.executor.datetime") as mock_dt:
-                mock_is_open.return_value = True
+    with patch("app.services.executor.datetime") as mock_dt:
+        import itertools
 
-                import itertools
+        ts = datetime.now(timezone.utc).timestamp()
+        mock_dt.now.return_value.timestamp.side_effect = itertools.count(ts, 10.0)
+        mock_dt.now.return_value.tzinfo = timezone.utc
 
-                ts = datetime.now(timezone.utc).timestamp()
-                mock_dt.now.return_value.timestamp.side_effect = itertools.count(
-                    ts, 10.0
-                )
-                mock_dt.now.return_value.tzinfo = timezone.utc
-
-                await executor._monitor_position(
-                    deal_id="DEAL123",
-                    epic="TEST",
-                    direction="BUY",
-                    entry_price=100.0,
-                    current_stop=90.0,
-                    atr=5.0,
-                    size=1.0,
-                )
+        await executor._monitor_position(
+            deal_id="DEAL123",
+            epic="TEST",
+            direction="BUY",
+            entry_price=100.0,
+            current_stop=90.0,
+            atr=5.0,
+            size=1.0,
+        )
 
     # Verify calls
     assert mock_client.update_open_position.call_count >= 1
@@ -139,34 +128,28 @@ async def test_executor_force_close_at_market_close(mock_deps):
     mock_streamer.stream = mock_stream
 
     executor = TradeExecutor(mock_client, mock_streamer, mock_status)
+    executor._sync_outcome = cast(Any, AsyncMock())
+    executor._is_position_open = cast(Any, AsyncMock(return_value=True))
 
-    with (
-        patch.object(executor, "_sync_outcome", new_callable=AsyncMock),
-        patch.object(
-            executor, "_is_position_open", new_callable=AsyncMock
-        ) as mock_is_open,
-    ):
-        with patch("app.services.executor.datetime") as mock_dt:
-            mock_is_open.return_value = True
+    with patch("app.services.executor.datetime") as mock_dt:
+        # Mock datetime.now() to return sequence of times
+        # 1. Start Time (base_time)
+        # 2. Loop Check 1 (base_time + 70s) -> >60s triggers liveness/close check
+        mock_dt.now.side_effect = [
+            base_time,
+            base_time + timedelta(seconds=70),
+            base_time + timedelta(seconds=80),
+        ]
 
-            # Mock datetime.now() to return sequence of times
-            # 1. Start Time (base_time)
-            # 2. Loop Check 1 (base_time + 70s) -> >60s triggers liveness/close check
-            mock_dt.now.side_effect = [
-                base_time,
-                base_time + timedelta(seconds=70),
-                base_time + timedelta(seconds=80),
-            ]
-
-            await executor._monitor_position(
-                deal_id="DEAL123",
-                epic="TEST",
-                direction="BUY",
-                entry_price=100,
-                current_stop=90,
-                atr=5,
-                size=1,
-            )
+        await executor._monitor_position(
+            deal_id="DEAL123",
+            epic="TEST",
+            direction="BUY",
+            entry_price=100,
+            current_stop=90,
+            atr=5,
+            size=1,
+        )
 
     # Verify Force Close
     mock_client.close_open_position.assert_called_once()

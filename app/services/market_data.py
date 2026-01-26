@@ -77,11 +77,24 @@ class MarketDataService:
             if age > max_age_seconds:
                 # Case 2: Data exists but is stale (gap at the end)
                 should_fetch_delta = True
-                delta_start = last_time.strftime("%Y-%m-%d %H:%M:%S")
-                # Add slight buffer to end date (IG API handles 'now' implicitly if end is future,
-                # but safer to specify or let it infer. IG Range requires both usually.)
-                # We'll use Now + 1 minute to be safe
-                delta_end = (now + timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+                # Optimize: If gap is huge (e.g. weekend gap of 3000 bars) but we only want last 100,
+                # fetching the whole delta is wasteful.
+                gap_bars = age / interval_seconds
+                if gap_bars > (num_points * 1.5):
+                    logger.info(
+                        f"Gap ({int(gap_bars)} bars) > Requested ({num_points}). Switching to Full Fetch."
+                    )
+                    should_fetch_full = True
+                    should_fetch_delta = False
+                else:
+                    delta_start = last_time.strftime("%Y-%m-%d %H:%M:%S")
+                    # Add slight buffer to end date (IG API handles 'now' implicitly if end is future,
+                    # but safer to specify or let it infer. IG Range requires both usually.)
+                    # We'll use Now + 1 minute to be safe
+                    delta_end = (now + timedelta(minutes=1)).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
 
             elif len(existing_candles) < num_points:
                 # Case 3: Data is fresh, but we don't have enough history (gap at the start)

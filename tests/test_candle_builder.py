@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 from app.streamer.candle_builder import CandleBuilder
 
@@ -15,6 +15,7 @@ async def test_candle_builder_aggregation():
     # Mock DB session
     with patch("app.streamer.candle_builder.async_session_maker") as mock_session_maker:
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()  # session.add is synchronous
         mock_session_maker.return_value.__aenter__.return_value = mock_session
 
         # 1. First Tick (Initialization)
