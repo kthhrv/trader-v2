@@ -86,11 +86,11 @@ class MarketAnalyzer:
                 microsecond=0,
             )
 
-            # If we are within 30 minutes AFTER the scheduled open time
+            # If we are within 15 minutes BEFORE or 30 minutes AFTER the scheduled open time
             time_since_open = (now_localized - market_open).total_seconds()
-            if 0 <= time_since_open <= 1800:
+            if -900 <= time_since_open <= 1800:
                 logger.info(
-                    f"Market Open Phase ({int(time_since_open / 60)}m since open). Forcing default strategy."
+                    f"Market Open Phase ({int(time_since_open / 60)}m relative to open). Forcing default strategy."
                 )
                 return default_id
 
