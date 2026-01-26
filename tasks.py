@@ -86,7 +86,7 @@ def down(c):
 
 
 @task
-def deploy(c):
+def deploy(c, nuke=False):
     """
     Deploy the 4 stacks to the production server (192.168.0.191).
     """
@@ -145,10 +145,11 @@ def deploy(c):
     c.run(f"ssh {remote_user}@{remote_host} 'docker network create trader-net || true'")
 
     # Cleanup old containers (Migration Step)
-    print("Cleaning up potential conflicts...")
-    c.run(
-        f"ssh {remote_user}@{remote_host} 'docker rm -f trader-v2 trader-v2-ui trader-v2-watchdog trader-redis trader-streamer 2>/dev/null || true'"
-    )
+    if nuke:
+        print("Cleaning up potential conflicts (NUKE MODE)...")
+        c.run(
+            f"ssh {remote_user}@{remote_host} 'docker rm -f trader-v2 trader-v2-ui trader-v2-watchdog trader-redis trader-streamer 2>/dev/null || true'"
+        )
 
     # Note: We pass HOST_DATA_PATH via env on the server or in the command
     env_vars = "HOST_DATA_PATH=/opt/trader-v2-data"
