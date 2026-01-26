@@ -1,10 +1,11 @@
-import os
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import redis.asyncio as redis
 from app.core.logger import logger
+from app.core.config import settings
 from app.adapters.notification import HomeAssistantNotifier
 
-HEARTBEAT_FILE = "data/heartbeat.txt"
+REDIS_KEY = "health:app:last_seen"
 CHECK_INTERVAL = 60  # seconds
 STALE_THRESHOLD_MINUTES = 5
 
@@ -19,7 +20,7 @@ async def check_liveness():
         )
     else:
         logger.info(
-            f"Watchdog started. Monitoring {HEARTBEAT_FILE}. Notifications enabled."
+            f"Watchdog started. Monitoring Redis key {REDIS_KEY}. Notifications enabled."
         )
 
     while True:
@@ -27,24 +28,34 @@ async def check_liveness():
             is_stale = False
             time_diff_str = "Unknown"
 
-            if not os.path.exists(HEARTBEAT_FILE):
-                logger.warning(f"Heartbeat file {HEARTBEAT_FILE} missing!")
+            r = redis.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                decode_responses=True,
+            )
+            content = await r.get(REDIS_KEY)
+            await r.close()
+
+            if not content:
+                logger.warning(f"Heartbeat key {REDIS_KEY} missing!")
                 is_stale = True
-                time_diff_str = "File Missing"
+                time_diff_str = "Key Missing"
             else:
                 try:
-                    with open(HEARTBEAT_FILE, "r") as f:
-                        content = f.read().strip()
-                        last_heartbeat = datetime.fromisoformat(content)
-                        time_diff = datetime.now() - last_heartbeat
-                        is_stale = time_diff > timedelta(
-                            minutes=STALE_THRESHOLD_MINUTES
-                        )
-                        time_diff_str = str(time_diff).split(".")[0]
+                    last_heartbeat = datetime.fromisoformat(content)
+                    # Use UTC if the timestamp is aware
+                    now = (
+                        datetime.now(timezone.utc)
+                        if last_heartbeat.tzinfo
+                        else datetime.now()
+                    )
+                    time_diff = now - last_heartbeat
+                    is_stale = time_diff > timedelta(minutes=STALE_THRESHOLD_MINUTES)
+                    time_diff_str = str(time_diff).split(".")[0]
                 except Exception as e:
-                    logger.error(f"Error reading heartbeat file: {e}")
+                    logger.error(f"Error parsing heartbeat: {e}")
                     is_stale = True
-                    time_diff_str = "Read Error"
+                    time_diff_str = "Parse Error"
 
             if is_stale:
                 msg = f"Trader V2 bot heartbeat is stale ({time_diff_str}). The process may be hung or crashed."

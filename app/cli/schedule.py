@@ -1,23 +1,26 @@
 import asyncio
-import os
-from datetime import datetime
+from datetime import datetime, timezone
+import redis.asyncio as redis
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.core.logger import logger
+from app.core.config import settings
 from app.core.markets import MARKET_CONFIGS
 from app.cli.trade import run_market_strategy
 
 
-def update_heartbeat():
+async def update_heartbeat():
     """
-    Updates the heartbeat file to indicate the system is alive.
+    Updates the Redis heartbeat key to indicate the system is alive.
     """
     try:
-        os.makedirs("data", exist_ok=True)
-        with open("data/heartbeat.txt", "w") as f:
-            f.write(datetime.now().isoformat())
+        r = redis.Redis(
+            host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True
+        )
+        await r.set("health:app:last_seen", datetime.now(timezone.utc).isoformat())
+        await r.close()
     except Exception as e:
-        logger.error(f"Failed to update heartbeat: {e}")
+        logger.error(f"Failed to update Redis heartbeat: {e}")
 
 
 async def run_scheduler(dry_run: bool):

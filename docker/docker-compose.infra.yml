@@ -19,8 +19,6 @@ services:
       - redis
     networks:
       - trader-net
-    volumes:
-      - ${HOST_DATA_PATH:-./data}:/app/data
     env_file:
       - .env
     environment:

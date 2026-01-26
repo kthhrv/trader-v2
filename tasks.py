@@ -127,7 +127,7 @@ def deploy(c, nuke=False):
     print(f"--- 1. Syncing Configs to {remote_host} ---")
     # Ensure directories exist
     c.run(
-        f"ssh {remote_user}@{remote_host} 'mkdir -p {logging_path} {infra_path} {app_path} {watchdog_path} /opt/trader-v2-data'"
+        f"ssh {remote_user}@{remote_host} 'mkdir -p {logging_path} {infra_path} {app_path} {watchdog_path}'"
     )
 
     # Sync compose files
@@ -176,9 +176,6 @@ def deploy(c, nuke=False):
             f"ssh {remote_user}@{remote_host} 'docker rm -f trader-v2 trader-v2-ui trader-v2-watchdog trader-redis trader-streamer 2>/dev/null || true'"
         )
 
-    # Note: We pass HOST_DATA_PATH via env on the server or in the command
-    env_vars = "HOST_DATA_PATH=/opt/trader-v2-data"
-
     print("Restarting Logging...")
     c.run(
         f"ssh {remote_user}@{remote_host} 'docker compose -p trader-logging -f {logging_path}/compose.yaml up -d --pull always --remove-orphans'"
@@ -186,17 +183,17 @@ def deploy(c, nuke=False):
 
     print("Restarting Infra...")
     c.run(
-        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-infra -f {infra_path}/compose.yaml up -d --pull always --remove-orphans'"
+        f"ssh {remote_user}@{remote_host} 'docker compose -p trader-infra -f {infra_path}/compose.yaml up -d --pull always --remove-orphans'"
     )
 
     print("Restarting App...")
     c.run(
-        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-app -f {app_path}/compose.yaml up -d --pull always --remove-orphans'"
+        f"ssh {remote_user}@{remote_host} 'docker compose -p trader-app -f {app_path}/compose.yaml up -d --pull always --remove-orphans'"
     )
 
     print("Restarting Watchdog...")
     c.run(
-        f"ssh {remote_user}@{remote_host} '{env_vars} docker compose -p trader-watchdog -f {watchdog_path}/compose.yaml up -d --pull always --remove-orphans'"
+        f"ssh {remote_user}@{remote_host} 'docker compose -p trader-watchdog -f {watchdog_path}/compose.yaml up -d --pull always --remove-orphans'"
     )
 
     print("\nDeployment Complete.")
