@@ -8,7 +8,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - ./logging/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
       - loki-data:/tmp/loki
     networks:
       - trader-net
@@ -23,7 +23,7 @@ services:
     container_name: trader-promtail
     restart: unless-stopped
     volumes:
-      - ./logging/promtail-config.yaml:/etc/promtail/config.yml
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
@@ -45,9 +45,9 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./logging/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
-      - ./logging/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
-      - ./logging/dashboards:/var/lib/grafana/dashboards
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./observability/dashboards:/var/lib/grafana/dashboards
     networks:
       - trader-net
     logging:
@@ -63,7 +63,7 @@ services:
     container_name: trader-prometheus
     restart: unless-stopped
     volumes:
-      - ./logging/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

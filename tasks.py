@@ -29,14 +29,16 @@ def publish(c):
 @task
 def up(c):
     """
-    Start the full 4-stack environment (Logging, Infra, App, Watchdog) locally.
+    Start the full 4-stack environment (Observability, Infra, App, Watchdog) locally.
     """
     print("--- 1. Creating Network ---")
     c.run("docker network create trader-net || true")
 
-    print("\n--- 2. Starting Logging Stack (Loki, Promtail, Grafana) ---")
+    print(
+        "\n--- 2. Starting Observability Stack (Loki, Promtail, Grafana, Prometheus) ---"
+    )
     c.run(
-        "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml up -d"
+        "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml up -d"
     )
 
     print("\n--- 3. Starting Infra Stack (Redis, Streamer) ---")
@@ -77,9 +79,9 @@ def down(c):
         "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml down"
     )
 
-    print("\n--- 4. Stopping Logging Stack ---")
+    print("\n--- 4. Stopping Observability Stack ---")
     c.run(
-        "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml down"
+        "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml down"
     )
 
     print("\nAll stacks stopped.")
@@ -88,13 +90,13 @@ def down(c):
 @task
 def restart(c, stack="all"):
     """
-    Restart specific stack(s): app, infra, logging, watchdog, or all.
+    Restart specific stack(s): app, infra, observability, watchdog, or all.
     """
     stacks = {
         "watchdog": "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml -f docker/docker-compose.watchdog.dev.yml restart",
         "app": "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml -f docker/docker-compose.app.dev.yml restart",
         "infra": "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml restart",
-        "logging": "docker compose --project-directory . -p trader-logging -f docker/docker-compose.logging.yml restart",
+        "observability": "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml restart",
     }
 
     if stack == "all":
@@ -119,7 +121,7 @@ def deploy(c, nuke=False):
     remote_user = "root"  # Update if different
     base_path = "/opt/stacks"
 
-    logging_path = f"{base_path}/trader-logging"
+    observability_path = f"{base_path}/trader-observability"
     infra_path = f"{base_path}/trader-infra"
     app_path = f"{base_path}/trader-app"
     watchdog_path = f"{base_path}/trader-watchdog"
@@ -127,12 +129,12 @@ def deploy(c, nuke=False):
     print(f"--- 1. Syncing Configs to {remote_host} ---")
     # Ensure directories exist
     c.run(
-        f"ssh {remote_user}@{remote_host} 'mkdir -p {logging_path} {infra_path} {app_path} {watchdog_path}'"
+        f"ssh {remote_user}@{remote_host} 'mkdir -p {observability_path} {infra_path} {app_path} {watchdog_path}'"
     )
 
     # Sync compose files
     c.run(
-        f"scp docker/docker-compose.logging.yml {remote_user}@{remote_host}:{logging_path}/compose.yaml"
+        f"scp docker/docker-compose.observability.yml {remote_user}@{remote_host}:{observability_path}/compose.yaml"
     )
     c.run(
         f"scp docker/docker-compose.infra.yml {remote_user}@{remote_host}:{infra_path}/compose.yaml"
@@ -144,19 +146,22 @@ def deploy(c, nuke=False):
         f"scp docker/docker-compose.watchdog.yml {remote_user}@{remote_host}:{watchdog_path}/compose.yaml"
     )
 
-    # Sync logging configs
-    # The compose file expects ./docker/logging/... relative to itself
-    # We are placing compose.yaml in {logging_path}, so we need {logging_path}/docker/logging
-    remote_logging_conf_dir = f"{logging_path}/docker/logging"
-    c.run(f"ssh {remote_user}@{remote_host} 'mkdir -p {remote_logging_conf_dir}'")
+    # Sync observability configs
+    # The compose file expects ./observability/... relative to itself
+    # We are placing compose.yaml in {observability_path}, so we need {observability_path}/observability
+    remote_obs_conf_dir = f"{observability_path}/observability"
+    c.run(f"ssh {remote_user}@{remote_host} 'mkdir -p {remote_obs_conf_dir}'")
 
     # Copy all yaml config files
     c.run(
-        f"scp docker/logging/*.yaml {remote_user}@{remote_host}:{remote_logging_conf_dir}/"
+        f"scp docker/observability/*.yaml {remote_user}@{remote_host}:{remote_obs_conf_dir}/"
+    )
+    c.run(
+        f"scp docker/observability/*.yml {remote_user}@{remote_host}:{remote_obs_conf_dir}/"
     )
     # Copy dashboards directory recursively
     c.run(
-        f"scp -r docker/logging/dashboards {remote_user}@{remote_host}:{remote_logging_conf_dir}/"
+        f"scp -r docker/observability/dashboards {remote_user}@{remote_host}:{remote_obs_conf_dir}/"
     )
 
     # Sync Environment Variables (Crucial!)
@@ -176,9 +181,9 @@ def deploy(c, nuke=False):
             f"ssh {remote_user}@{remote_host} 'docker rm -f trader-v2 trader-v2-ui trader-v2-watchdog trader-redis trader-streamer 2>/dev/null || true'"
         )
 
-    print("Restarting Logging...")
+    print("Restarting Observability...")
     c.run(
-        f"ssh {remote_user}@{remote_host} 'docker compose -p trader-logging -f {logging_path}/compose.yaml up -d --pull always --remove-orphans'"
+        f"ssh {remote_user}@{remote_host} 'docker compose -p trader-observability -f {observability_path}/compose.yaml up -d --pull always --remove-orphans'"
     )
 
     print("Restarting Infra...")
