@@ -5,6 +5,7 @@ from app.adapters.ig_client import AsyncIGClient
 from app.database import session as db_session
 from app.database.models import HistoricalCandle
 from app.core.logger import logger
+from app.core.config import settings
 
 
 class CollectorService:
@@ -21,7 +22,7 @@ class CollectorService:
                 epic,
                 resolution,
                 num_points,
-                env_type="LIVE",  # Always default to LIVE for data (better quota)
+                env_type=settings.DATA_ACCOUNT_ENV,
             )
             await self._process_and_save(epic, resolution, raw_data)
         except Exception as e:
@@ -39,7 +40,11 @@ class CollectorService:
         )
         try:
             raw_data = await self.ig_client.fetch_historical_prices_by_range(
-                epic, resolution, start_date, end_date, env_type="LIVE"
+                epic,
+                resolution,
+                start_date,
+                end_date,
+                env_type=settings.DATA_ACCOUNT_ENV,
             )
             await self._process_and_save(epic, resolution, raw_data)
         except Exception as e:
@@ -98,7 +103,8 @@ class CollectorService:
                 HistoricalCandle.timestamp >= min_ts,
                 HistoricalCandle.timestamp <= max_ts,
             )
-            existing = (await session.execute(stmt)).scalars().all()
+            result = await session.execute(stmt)
+            existing = result.scalars().all()
             # Normalize DB timestamps to match incoming format (aware UTC)
             # If DB returns naive, replace with UTC.
             existing_set = {

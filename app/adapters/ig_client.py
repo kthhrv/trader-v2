@@ -215,7 +215,11 @@ class AsyncIGClient:
         retry=retry_if_exception_type(httpx.RequestError),
     )
     async def fetch_historical_prices(
-        self, epic: str, resolution: str, num_points: int, env_type: str = "LIVE"
+        self,
+        epic: str,
+        resolution: str,
+        num_points: int,
+        env_type: str = settings.DATA_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         url = f"prices/{epic}/{resolution}/{num_points}"
         headers = {"VERSION": "2"}
@@ -239,7 +243,7 @@ class AsyncIGClient:
         resolution: str,
         start_date: str,
         end_date: str,
-        env_type: str = "LIVE",
+        env_type: str = settings.DATA_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         url = f"prices/{epic}/{resolution}/{start_date}/{end_date}"
         headers = {"VERSION": "2"}
@@ -258,7 +262,7 @@ class AsyncIGClient:
         retry=retry_if_exception_type(httpx.RequestError),
     )
     async def fetch_market_details(
-        self, epic: str, env_type: str = "LIVE"
+        self, epic: str, env_type: str = settings.DATA_ACCOUNT_ENV
     ) -> Dict[str, Any]:
         """
         Fetches full market details including snapshot (Bid/Offer).
@@ -276,7 +280,9 @@ class AsyncIGClient:
             )
             raise IGClientError(f"HTTP {e.response.status_code}: {e.response.text}")
 
-    async def get_account_balance(self, env_type: str = "DEMO") -> float:
+    async def get_account_balance(
+        self, env_type: str = settings.TRADING_ACCOUNT_ENV
+    ) -> float:
         headers = {"VERSION": "1"}
         try:
             response = await self._api_request(
@@ -297,7 +303,7 @@ class AsyncIGClient:
             raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def search_markets(
-        self, search_term: str, env_type: str = "LIVE"
+        self, search_term: str, env_type: str = settings.DATA_ACCOUNT_ENV
     ) -> Dict[str, Any]:
         url = f"markets?searchTerm={search_term}"
         headers = {"VERSION": "1"}
@@ -316,7 +322,7 @@ class AsyncIGClient:
         retry=retry_if_exception_type(httpx.RequestError),
     )
     async def fetch_market_by_epic(
-        self, epic: str, env_type: str = "LIVE"
+        self, epic: str, env_type: str = settings.DATA_ACCOUNT_ENV
     ) -> Dict[str, Any]:
         """
         Fetches basic market details by epic (lighter than fetch_market_details).
@@ -339,7 +345,7 @@ class AsyncIGClient:
         retry=retry_if_exception_type(httpx.RequestError),
     )
     async def fetch_client_sentiment_by_instrument(
-        self, market_id: str, env_type: str = "LIVE"
+        self, market_id: str, env_type: str = settings.DATA_ACCOUNT_ENV
     ) -> Dict[str, Any]:
         """
         Fetches client sentiment (long/short %) for a given market ID.
@@ -362,7 +368,7 @@ class AsyncIGClient:
         deal_id: str,
         stop_level: float,
         limit_level: Optional[float] = None,
-        env_type: str = "LIVE",
+        env_type: str = settings.TRADING_ACCOUNT_ENV,
     ):
         headers = {"VERSION": "2", "_method": "PUT"}
         payload = {"stopLevel": stop_level, "limitLevel": limit_level}
@@ -379,7 +385,9 @@ class AsyncIGClient:
             logger.error(f"Failed to update position {deal_id}: {e.response.text}")
             raise IGClientError(f"HTTP {e.response.status_code}")
 
-    async def fetch_open_positions(self, env_type: str = "LIVE") -> Dict[str, Any]:
+    async def fetch_open_positions(
+        self, env_type: str = settings.TRADING_ACCOUNT_ENV
+    ) -> Dict[str, Any]:
         headers = {"VERSION": "2"}
         try:
             response = await self._api_request(
@@ -391,7 +399,9 @@ class AsyncIGClient:
             raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def fetch_transaction_history(
-        self, max_span_seconds: int = 172800, env_type: str = "LIVE"
+        self,
+        max_span_seconds: int = 172800,
+        env_type: str = settings.TRADING_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         # API expects milliseconds
         period_millis = max_span_seconds * 1000
@@ -412,7 +422,7 @@ class AsyncIGClient:
         self,
         max_span_seconds: int = 86400,
         deal_id: Optional[str] = None,
-        env_type: str = "LIVE",
+        env_type: str = settings.TRADING_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         """
         Fetches activity history. Uses Version 3.
@@ -446,7 +456,7 @@ class AsyncIGClient:
         deal_id: str,
         direction: str,
         size: float,
-        env_type: str = "LIVE",
+        env_type: str = settings.TRADING_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         """
         Closes an open position.
@@ -478,7 +488,7 @@ class AsyncIGClient:
             raise IGClientError(f"HTTP {e.response.status_code}")
 
     async def fetch_deal_confirmation(
-        self, deal_reference: str, env_type: str = "LIVE"
+        self, deal_reference: str, env_type: str = settings.TRADING_ACCOUNT_ENV
     ) -> Dict[str, Any]:
         """
         Fetches the confirmation for a deal reference to get the actual Deal ID.
@@ -503,7 +513,7 @@ class AsyncIGClient:
         size: float,
         stop_level: float,
         limit_level: Optional[float] = None,
-        env_type: str = "DEMO",
+        env_type: str = settings.TRADING_ACCOUNT_ENV,
     ) -> Dict[str, Any]:
         payload = {
             "epic": epic,
