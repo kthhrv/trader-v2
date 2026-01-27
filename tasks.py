@@ -113,7 +113,7 @@ def restart(c, stack="all"):
 
 
 @task
-def deploy(c, nuke=False):
+def deploy(c, nuke=False, tag=True):
     """
     Deploy the 4 stacks to the production server (192.168.0.191).
     """
@@ -202,6 +202,18 @@ def deploy(c, nuke=False):
     )
 
     print("\nDeployment Complete.")
+
+    if tag:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+        tag_name = f"release/prod-{timestamp}"
+        print(f"\n--- Tagging Release: {tag_name} ---")
+        try:
+            c.run(f"git tag {tag_name}")
+            # Update floating 'prod' tag
+            c.run("git tag -f prod")
+            print("Local tags updated.")
+        except Exception as e:
+            print(f"Warning: Failed to create tags: {e}")
 
 
 @task
