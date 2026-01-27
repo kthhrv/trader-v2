@@ -289,6 +289,11 @@ def logs(c, limit=100, host="local", follow=True):
                 # Format: [TIME] [PREFIX] [LEVEL] - MESSAGE
                 level = data["record"].get("level", {}).get("name", "INFO")
                 msg = data["record"].get("message", "")
+
+                # Filter out Watchdog INFO noise
+                if prefix == "trader-v2-watchdog" and level == "INFO":
+                    return None
+
                 return f"[{prefix:<20}] {level:<8} | {msg}"
             elif isinstance(data, dict) and "text" in data:
                 return f"[{prefix:<20}] {data['text'].strip()}"
@@ -321,7 +326,9 @@ def logs(c, limit=100, host="local", follow=True):
         initial_logs.sort(key=lambda x: x[0])
         for ts, prefix, line in initial_logs:
             dt = datetime.fromtimestamp(ts / 1e9).strftime("%H:%M:%S")
-            print(f"[{dt}] {format_log_line(prefix, line)}")
+            formatted = format_log_line(prefix, line)
+            if formatted:
+                print(f"[{dt}] {formatted}")
             last_ts_ns = max(last_ts_ns, ts)
 
     except Exception as e:
@@ -353,7 +360,9 @@ def logs(c, limit=100, host="local", follow=True):
                 new_logs.sort(key=lambda x: x[0])
                 for ts, prefix, line in new_logs:
                     dt = datetime.fromtimestamp(ts / 1e9).strftime("%H:%M:%S")
-                    print(f"[{dt}] {format_log_line(prefix, line)}")
+                    formatted = format_log_line(prefix, line)
+                    if formatted:
+                        print(f"[{dt}] {formatted}")
                     last_ts_ns = max(last_ts_ns, ts)
             except Exception:
                 pass
