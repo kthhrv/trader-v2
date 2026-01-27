@@ -87,6 +87,28 @@ async def test_dynamic_sizing_floor_protection(risk_manager, base_signal):
 
 
 @pytest.mark.asyncio
+async def test_stop_loss_widening(risk_manager, base_signal):
+    """
+    Test that stop loss is widened if tighter than 1.0x ATR.
+    ATR: 20.0
+    Min Dist: 20.0
+    Initial Stop: 90.0 (Dist 10.0) -> Too tight
+    New Stop: 80.0 (Dist 20.0)
+    Size: Risk 100 / 20 = 5.0
+    """
+    settings.MIN_ACCOUNT_BALANCE = 0.0
+    base_signal.atr = 20.0
+    base_signal.entry = 100.0
+    base_signal.stop_loss = 90.0  # 10 dist
+
+    valid = await risk_manager.validate_signal(base_signal)
+
+    assert valid is True
+    assert base_signal.stop_loss == 80.0  # 100 - 20
+    assert base_signal.size == 5.0  # 100 / 20
+
+
+@pytest.mark.asyncio
 async def test_validate_signal_fetch_balance_failure(risk_manager, base_signal):
     """
     Test fail-safe if balance fetch fails.
@@ -104,6 +126,7 @@ async def test_validate_signal_zero_distance(risk_manager, base_signal):
     Test rejection if stop loss equals entry (distance 0).
     """
     base_signal.stop_loss = 100.0  # Same as entry
+    base_signal.atr = 0.0  # Force skip widening
 
     valid = await risk_manager.validate_signal(base_signal)
 

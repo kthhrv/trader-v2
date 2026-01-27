@@ -51,6 +51,22 @@ class RiskManager:
             logger.error("Invalid Stop Loss: Distance is 0")
             return False
 
+        # --- 1. Minimum Stop Distance Check (1.0x ATR) ---
+        if signal.atr and signal.atr > 0:
+            min_stop_dist = 1.0 * signal.atr
+            if distance < min_stop_dist:
+                old_stop = signal.stop_loss
+                if signal.action == Action.BUY:
+                    signal.stop_loss = signal.entry - min_stop_dist
+                elif signal.action == Action.SELL:
+                    signal.stop_loss = signal.entry + min_stop_dist
+
+                logger.warning(
+                    f"Risk Adjustment: Stop Loss too tight ({distance:.2f} < 1.0xATR {min_stop_dist:.2f}). "
+                    f"Widened from {old_stop} to {signal.stop_loss}."
+                )
+                distance = min_stop_dist
+
         # Calculate Target Size based on Risk Rule
         target_size = max_risk_amount / distance
         # Round down to 2 decimal places
