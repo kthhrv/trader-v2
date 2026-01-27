@@ -6,6 +6,11 @@ services:
     command: ["python", "main.py", "--server", "--verbose"]
     networks:
       - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - .env
     environment:
@@ -20,6 +25,11 @@ services:
     command: ["python", "main.py", "--watch", "--verbose"]
     networks:
       - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - .env
     environment:
@@ -38,6 +48,11 @@ services:
       - "8000:8000"
     networks:
       - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - .env
     depends_on:

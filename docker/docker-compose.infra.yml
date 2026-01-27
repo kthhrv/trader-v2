@@ -7,6 +7,11 @@ services:
       - "6379:6379"
     networks:
       - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - redis-data:/data
 
@@ -19,6 +24,11 @@ services:
       - redis
     networks:
       - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - .env
     environment:
