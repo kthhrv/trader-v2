@@ -31,10 +31,10 @@ This document tracks identified areas where the codebase deviates from best prac
 
 ---
 
-## 3. Database
+## 4. Execution Logic
 
-### ⚠️ SQLite "Wal Checkpoint" Logic
-- **Location:** `app/database/session.py`
-- **Issue:** We manually run `PRAGMA wal_checkpoint(TRUNCATE)` on startup.
-- **Risk:** This might lock the DB if another process (Streamer) is writing.
-- **Remediation:** Remove manual checkpoints once migrated to PostgreSQL.
+### ⚠️ Redundant REST Polling for Trade Closure
+- **Location:** `app/services/executor.py` -> `_monitor_position`
+- **Issue:** The monitor loop performs a periodic REST call (`fetch_open_positions`) every 60 seconds to check if a position is still open. 
+- **Risk:** This is redundant because the bot already subscribes to the Lightstreamer `TRADE` channel and handles `OPU` (Order Position Update) events in real-time. Continuous polling unnecessarily consumes IG API quota.
+- **Remediation:** Remove the 60-second polling check and rely solely on the WebSocket trade updates. Implement a single REST fallback only if a heartbeat from the Streamer is missed for an extended period.
