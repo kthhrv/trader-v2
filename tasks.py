@@ -37,8 +37,9 @@ def up(c):
     print(
         "\n--- 2. Starting Observability Stack (Loki, Promtail, Grafana, Prometheus) ---"
     )
+    # Removing --project-directory . to resolve relative paths from docker/ directory
     c.run(
-        "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml up -d"
+        "docker compose -p trader-observability -f docker/docker-compose.observability.yml up -d"
     )
 
     print("\n--- 3. Starting Infra Stack (Redis, Streamer) ---")
@@ -81,7 +82,7 @@ def down(c):
 
     print("\n--- 4. Stopping Observability Stack ---")
     c.run(
-        "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml down"
+        "docker compose -p trader-observability -f docker/docker-compose.observability.yml down"
     )
 
     print("\nAll stacks stopped.")
@@ -96,7 +97,7 @@ def restart(c, stack="all"):
         "watchdog": "docker compose --project-directory . -p trader-watchdog -f docker/docker-compose.watchdog.yml -f docker/docker-compose.watchdog.dev.yml restart",
         "app": "docker compose --project-directory . -p trader-app -f docker/docker-compose.app.yml -f docker/docker-compose.app.dev.yml restart",
         "infra": "docker compose --project-directory . -p trader-infra -f docker/docker-compose.infra.yml -f docker/docker-compose.infra.dev.yml restart",
-        "observability": "docker compose --project-directory . -p trader-observability -f docker/docker-compose.observability.yml restart",
+        "observability": "docker compose -p trader-observability -f docker/docker-compose.observability.yml restart",
     }
 
     if stack == "all":
