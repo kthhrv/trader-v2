@@ -317,7 +317,7 @@
         {
           "datasource": "Loki",
           "editorMode": "code",
-          "expr": "sum by (level) (count_over_time({project=~\"trader.+\"} | json [1m]))",
+          "expr": "sum by (level) (count_over_time({project=~\"trader-(app|infra|watchdog)\"} | json | __error__=\"\" [1m]))",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"
@@ -387,7 +387,7 @@
         {
           "datasource": "Loki",
           "editorMode": "code",
-          "expr": "{project=~\"trader.+\"} | json",
+          "expr": "{project=~\"trader-(app|infra|watchdog)\"} | json | __error__=\"\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -413,6 +413,6 @@
   "timezone": "",
   "title": "Trader V2 Operations",
   "uid": "trader-v2-ops",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

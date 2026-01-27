@@ -18,14 +18,16 @@ def configure_logging(verbose: bool = False):
 
     if is_docker:
         level = "INFO"
+        # Use JSON serialization for Docker/Loki
+        logger.add(sys.stderr, level=level, serialize=True)
     else:
         level = "INFO" if verbose else "WARNING"
-
-    logger.add(
-        sys.stderr,
-        level=level,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    )
+        # Use human-readable format for local dev
+        logger.add(
+            sys.stderr,
+            level=level,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        )
 
 
 def enable_notification_handler():

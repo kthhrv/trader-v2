@@ -262,113 +262,100 @@ def seed(c):
 
 
 @task
-def logs(c, limit=100, host="local"):
+def logs(c, limit=100, host="local", follow=True):
     """
-
-
     Stream unified logs from all stacks via Loki.
-
-
     host: 'local' (default) or 'prod' (192.168.0.191)
-
-
+    follow: True (default) to tail, False to print history and exit.
     """
-
     if host == "prod":
         loki_base = "http://192.168.0.191:3100"
-
     else:
         loki_base = "http://localhost:3100"
 
     loki_url = f"{loki_base}/loki/api/v1/query_range"
-
-    query = '{project=~"trader-(app|infra)"}'
+    query = '{project=~"trader-(app|infra|watchdog|observability)"}'
 
     print(f"--- Streaming Logs from Loki ({host.upper()}) ---")
-
     last_ts_ns = 0
 
-    # 1. Get Initial History (Backward from NOW)
+    def format_log_line(prefix, line):
+        import json
 
+        try:
+            # Try to parse as JSON (Loguru format)
+            data = json.loads(line)
+            if isinstance(data, dict) and "record" in data:
+                # Format: [TIME] [PREFIX] [LEVEL] - MESSAGE
+                level = data["record"].get("level", {}).get("name", "INFO")
+                msg = data["record"].get("message", "")
+                return f"[{prefix:<20}] {level:<8} | {msg}"
+            elif isinstance(data, dict) and "text" in data:
+                return f"[{prefix:<20}] {data['text'].strip()}"
+        except Exception:
+            pass
+        # Fallback to raw line
+        return f"[{prefix:<20}] {line.strip()}"
+
+    # 1. Get Initial History (Backward from NOW)
     try:
         now_ns = int(time.time() * 1e9)
-
         params = {
             "query": query,
             "limit": limit,
             "end": now_ns,
             "direction": "BACKWARD",
         }
-
         resp = requests.get(loki_url, params=params, timeout=5)
-
         data = resp.json()
-
         result = data.get("data", {}).get("result", [])
 
         initial_logs = []
-
         for stream in result:
             prefix = stream["stream"].get("container", "unknown")
-
             for entry in stream["values"]:
                 ts = int(entry[0])
-
                 initial_logs.append((ts, prefix, entry[1]))
 
         # Sort history Forward
-
         initial_logs.sort(key=lambda x: x[0])
-
         for ts, prefix, line in initial_logs:
             dt = datetime.fromtimestamp(ts / 1e9).strftime("%H:%M:%S")
-
-            print(f"[{dt}] {prefix:<20} | {line}")
-
+            print(f"[{dt}] {format_log_line(prefix, line)}")
             last_ts_ns = max(last_ts_ns, ts)
 
     except Exception as e:
         print(f"Error fetching history: {e}")
 
-    # 2. Tail Loop (Forward from last_ts)
+    if not follow:
+        return
 
+    # 2. Tail Loop (Forward from last_ts)
     try:
         while True:
             time.sleep(1.0)
-
             if last_ts_ns == 0:
                 last_ts_ns = int(time.time() * 1e9)
 
             params = {"query": query, "start": last_ts_ns + 1, "direction": "FORWARD"}
-
             try:
                 resp = requests.get(loki_url, params=params, timeout=2)
-
                 data = resp.json()
-
                 result = data.get("data", {}).get("result", [])
 
                 new_logs = []
-
                 for stream in result:
                     prefix = stream["stream"].get("container", "unknown")
-
                     for entry in stream["values"]:
                         ts = int(entry[0])
-
                         new_logs.append((ts, prefix, entry[1]))
 
                 new_logs.sort(key=lambda x: x[0])
-
                 for ts, prefix, line in new_logs:
                     dt = datetime.fromtimestamp(ts / 1e9).strftime("%H:%M:%S")
-
-                    print(f"[{dt}] {prefix:<20} | {line}")
-
+                    print(f"[{dt}] {format_log_line(prefix, line)}")
                     last_ts_ns = max(last_ts_ns, ts)
-
             except Exception:
                 pass
-
     except KeyboardInterrupt:
         print("\nStopped.")

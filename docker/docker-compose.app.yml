@@ -15,6 +15,7 @@ services:
       - .env
     environment:
       - REDIS_HOST=redis
+      - RUNNING_IN_DOCKER=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -34,6 +35,7 @@ services:
       - .env
     environment:
       - REDIS_HOST=redis
+      - RUNNING_IN_DOCKER=true
     depends_on:
       - trader
 

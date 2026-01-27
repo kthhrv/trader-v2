@@ -33,6 +33,7 @@ services:
       - .env
     environment:
       - REDIS_HOST=redis
+      - RUNNING_IN_DOCKER=true
 
 networks:
   trader-net:
