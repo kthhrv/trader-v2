@@ -8,7 +8,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - ./docker/logging/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./logging/loki-config.yaml:/etc/loki/local-config.yaml
       - loki-data:/tmp/loki
     networks:
       - trader-net
@@ -23,7 +23,7 @@ services:
     container_name: trader-promtail
     restart: unless-stopped
     volumes:
-      - ./docker/logging/promtail-config.yaml:/etc/promtail/config.yml
+      - ./logging/promtail-config.yaml:/etc/promtail/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
@@ -45,9 +45,9 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./docker/logging/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
-      - ./docker/logging/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
-      - ./docker/logging/dashboards:/var/lib/grafana/dashboards
+      - ./logging/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./logging/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./logging/dashboards:/var/lib/grafana/dashboards
     networks:
       - trader-net
     logging:
@@ -58,9 +58,51 @@ services:
     depends_on:
       - loki
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: trader-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./logging/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    networks:
+      - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: trader-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)'
+    networks:
+      - trader-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   trader-net:
     external: true
 
 volumes:
   loki-data:
+  prometheus-data:
