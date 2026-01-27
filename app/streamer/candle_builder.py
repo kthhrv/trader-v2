@@ -69,8 +69,10 @@ class CandleBuilder:
 
     async def _save_candle(self, data: dict, epic: str, resolution: str):
         try:
+            from sqlalchemy.dialects.postgresql import insert
+
             async with async_session_maker() as session:
-                candle = HistoricalCandle(
+                stmt = insert(HistoricalCandle).values(
                     symbol=epic,
                     resolution=resolution,
                     timestamp=data["timestamp"],
@@ -80,7 +82,12 @@ class CandleBuilder:
                     close=data["close"],
                     volume=data["volume"],
                 )
-                session.add(candle)
+                # Ignore duplicates (keep existing data)
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=["symbol", "resolution", "timestamp"]
+                )
+
+                await session.execute(stmt)
                 await session.commit()
                 logger.info(
                     f"Saved {resolution} candle for {epic} @ {data['timestamp'].strftime('%H:%M')}"
