@@ -48,6 +48,7 @@ data/trader.db
 .env
 .env.*
 !.env.example
+!.env.test
 
 # IDEs
 .vscode/

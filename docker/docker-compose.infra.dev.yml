@@ -1,15 +1,13 @@
 services:
   db:
     image: timescale/timescaledb:latest-pg18
-    container_name: trader-db
+    container_name: ${COMPOSE_PROJECT_NAME}-db
     environment:
       - POSTGRES_DB=trader2
       - POSTGRES_USER=trader
       - POSTGRES_PASSWORD=trader_pass
     ports:
       - "5432:5432"
-    networks:
-      - trader-net
     volumes:
       - trader-db-data:/var/lib/postgresql/data
 

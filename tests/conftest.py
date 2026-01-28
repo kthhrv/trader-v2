@@ -7,23 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 
-# 1. Mock Environment Variables
-@pytest.fixture(scope="session", autouse=True)
-def mock_env_vars():
-    os.environ["IG_DEMO_API_KEY"] = "test_demo_key"
-    os.environ["IG_DEMO_USERNAME"] = "test_demo_user"
-    os.environ["IG_DEMO_PASSWORD"] = "test_demo_pass"
-    os.environ["IG_DEMO_ACC_ID"] = "test_demo_acc"
-    os.environ["IG_LIVE_API_KEY"] = "test_live_key"
-    os.environ["IG_LIVE_USERNAME"] = "test_live_user"
-    os.environ["IG_LIVE_PASSWORD"] = "test_live_pass"
-    os.environ["IG_LIVE_ACC_ID"] = "test_live_acc"
-    os.environ["GEMINI_API_KEY"] = "test_gemini_key"
-    os.environ["TRADING_ACCOUNT_ENV"] = "DEMO"
-    os.environ["DATA_ACCOUNT_ENV"] = "LIVE"
-    return
-
-
+# 1. Mock Settings Utility
 @pytest.fixture(autouse=True)
 def mock_settings():
     from app.core.config import settings

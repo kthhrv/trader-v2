@@ -1,65 +1,55 @@
 services:
   trader:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
-    container_name: trader-v2
+    container_name: ${COMPOSE_PROJECT_NAME}-trader
     restart: unless-stopped
     command: ["python", "main.py", "--server", "--verbose"]
-    networks:
-      - trader-net
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
       - RUNNING_IN_DOCKER=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   watcher:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
-    container_name: trader-watcher
+    container_name: ${COMPOSE_PROJECT_NAME}-watcher
     restart: unless-stopped
     command: ["python", "main.py", "--watch", "--verbose"]
-    networks:
-      - trader-net
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
       - RUNNING_IN_DOCKER=true
     depends_on:
       - trader
 
   ui:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
-    container_name: trader-v2-ui
+    container_name: ${COMPOSE_PROJECT_NAME}-ui
     restart: unless-stopped
     working_dir: /app/dashboard
     command: ["reflex", "run", "--env", "prod", "--backend-host", "0.0.0.0"]
     ports:
-      - "3000:3000"
-      - "8000:8000"
-    networks:
-      - trader-net
+      - "${UI_PORT:-3000}:3000"
+      - "${UI_API_PORT:-8000}:8000"
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     depends_on:
       - trader
-
-networks:
-  trader-net:
-    external: true

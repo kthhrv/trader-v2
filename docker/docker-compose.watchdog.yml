@@ -1,21 +1,15 @@
 services:
   watchdog:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
-    container_name: trader-v2-watchdog
+    container_name: ${COMPOSE_PROJECT_NAME}-watchdog
     restart: unless-stopped
     command: ["python", "watchdog.py"]
-    networks:
-      - trader-net
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
       - RUNNING_IN_DOCKER=true
-
-networks:
-  trader-net:
-    external: true
