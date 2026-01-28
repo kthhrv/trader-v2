@@ -20,10 +20,10 @@ async def run_sync_trade(deal_id: str):
 
     async with async_session_maker() as session:
         # 1. Fetch trade from DB
-        result = await session.exec(
+        result = await session.execute(
             select(TradeExecution).where(TradeExecution.deal_id == deal_id)
         )
-        trade = result.first()
+        trade = result.scalars().first()
 
         if not trade:
             logger.error(f"Trade {deal_id} not found in database.")
@@ -32,10 +32,10 @@ async def run_sync_trade(deal_id: str):
         # Get Symbol/Epic from related signal
         epic = ""
         if trade.signal_id:
-            sig_res = await session.exec(
+            sig_res = await session.execute(
                 select(TradeSignal).where(TradeSignal.id == trade.signal_id)
             )
-            signal = sig_res.first()
+            signal = sig_res.scalars().first()
             epic = signal.symbol if signal else ""
 
         logger.info(f"Looking for closure of {epic} (Deal {deal_id})...")
