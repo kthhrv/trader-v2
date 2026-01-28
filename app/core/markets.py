@@ -44,7 +44,7 @@ MARKET_CONFIGS: Dict[str, Dict[str, Any]] = {
         "schedule": {"day_of_week": "mon-fri", "hour": 9, "minute": 55},
         "max_spread": 3.0,
         "strategy_id": "momentum_breakout",
-        "stalking": {"enabled": False},
+        "stalking": {"enabled": True, "duration_minutes": 60, "interval_minutes": 5},
     },
     "nasdaq": {
         "epic": "IX.D.NASDAQ.CASH.IP",
