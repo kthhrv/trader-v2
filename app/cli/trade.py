@@ -1,11 +1,146 @@
 import asyncio
 from datetime import datetime
+import pandas as pd
+from sqlmodel import select
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import Action, TradingSignal, EntryType
 from app.services.trader import StrategyResult
 from app.core.markets import MARKET_CONFIGS
 from app.core.container import Container
+from app.database.session import async_session_maker
+from app.database.models import TradeExecution, TradeSignal
+
+
+async def run_sync_trade(deal_id: str):
+    """
+    Manually syncs a trade's outcome from IG History to the DB.
+    """
+    logger.info(f"Syncing trade {deal_id} from IG API...")
+
+    async with async_session_maker() as session:
+        # 1. Fetch trade from DB
+        result = await session.exec(
+            select(TradeExecution).where(TradeExecution.deal_id == deal_id)
+        )
+        trade = result.first()
+
+        if not trade:
+            logger.error(f"Trade {deal_id} not found in database.")
+            return
+
+        # Get Symbol/Epic from related signal
+        epic = ""
+        if trade.signal_id:
+            sig_res = await session.exec(
+                select(TradeSignal).where(TradeSignal.id == trade.signal_id)
+            )
+            signal = sig_res.first()
+            epic = signal.symbol if signal else ""
+
+        logger.info(f"Looking for closure of {epic} (Deal {deal_id})...")
+
+        async with AsyncIGClient.get_instance() as client:
+            await client.authenticate()
+
+            # 2. Fetch History
+            try:
+                # Fetch last 48 hours
+                history_data = await client.fetch_transaction_history(
+                    max_span_seconds=172800
+                )
+                transactions = history_data.get("transactions", [])
+            except Exception as e:
+                logger.error(f"Failed to fetch history: {e}")
+                return
+
+            if not transactions:
+                logger.error("No transaction history returned.")
+                return
+
+            df = pd.DataFrame(transactions)
+
+            # 3. Find closing transaction
+            date_col = "dateUtc" if "dateUtc" in df.columns else "date"
+            if date_col in df.columns:
+                df[date_col] = pd.to_datetime(df[date_col])
+                df = df.sort_values(date_col, ascending=False)
+
+            target_row = None
+
+            epic_to_name_map = {
+                "SPTRD": "US 500",
+                "FTSE": "FTSE 100",
+                "DAX": "Germany 40",
+                "ASX": "Australia 200",
+                "NASDAQ": "US Tech 100",
+                "NIKKEI": "Japan 225",
+            }
+
+            for index, row in df.iterrows():
+                pnl_str = str(row.get("profitAndLoss", ""))
+                if not pnl_str or pnl_str == "nan" or pnl_str == "None":
+                    continue
+
+                try:
+                    pnl_val = float(
+                        pnl_str.replace("£", "").replace("A$", "").replace(",", "")
+                    )
+                except ValueError:
+                    continue
+
+                matched = False
+
+                # Direct epic match
+                if epic and epic in str(row.get("epic", "")):
+                    matched = True
+
+                # Name match
+                if not matched:
+                    inst_name = str(row.get("instrumentName", ""))
+                    if epic:
+                        core_code = (
+                            epic.split(".")[2] if len(epic.split(".")) > 2 else ""
+                        )
+                        expected_name = epic_to_name_map.get(core_code, core_code)
+                        if expected_name in inst_name:
+                            matched = True
+                    else:
+                        # Fallback: check reference for deal_id
+                        ref = str(row.get("reference", ""))
+                        if deal_id in ref:
+                            matched = True
+
+                if matched:
+                    target_row = row
+                    break
+
+            if target_row is not None:
+                pnl_str = str(target_row.get("profitAndLoss", ""))
+                pnl_val = float(
+                    pnl_str.replace("£", "").replace("A$", "").replace(",", "")
+                )
+                close_level = target_row.get("closeLevel") or target_row.get("level")
+
+                outcome = "WIN" if pnl_val > 0 else "LOSS"
+                if pnl_val == 0:
+                    outcome = "BREAKEVEN"
+
+                logger.info(
+                    f"Found Match! Updating Trade {deal_id}: PnL={pnl_val}, Outcome={outcome}"
+                )
+
+                trade.exit_price = float(close_level) if close_level else 0.0
+                trade.pnl = pnl_val
+                if date_col in target_row:
+                    trade.exit_time = target_row[date_col].to_pydatetime()
+                trade.outcome_status = outcome
+
+                session.add(trade)
+                await session.commit()
+                logger.info("Database updated successfully.")
+            else:
+                logger.warning("No matching closing transaction found.")
 
 
 async def run_test_trade(

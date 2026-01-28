@@ -5,7 +5,7 @@ from app.core.logger import logger, configure_logging, enable_notification_handl
 from app.core.config import settings
 from app.database.session import init_db
 from app.core.markets import MARKET_CONFIGS
-from app.cli.trade import run_market_strategy, run_test_trade
+from app.cli.trade import run_market_strategy, run_test_trade, run_sync_trade
 from app.cli.schedule import run_scheduler
 from app.cli.diagnostics import (
     run_post_mortem,
@@ -109,6 +109,11 @@ async def main():
         default="BUY",
         help="Action for --test-trade: 'BUY' or 'SELL'. Defaults to BUY.",
     )
+    parser.add_argument(
+        "--sync-trade",
+        type=str,
+        help="Manually sync a trade's outcome from IG History to DB. Usage: --sync-trade <deal_id>",
+    )
 
     # Print help and exit if no arguments provided
     if len(sys.argv) == 1:
@@ -169,6 +174,10 @@ async def main():
         await run_test_trade(
             args.market, args.test_trade_action, args.dry_run, args.yes
         )
+        return
+
+    if args.sync_trade:
+        await run_sync_trade(args.sync_trade)
         return
 
     if args.post_mortem:
