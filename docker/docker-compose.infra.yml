@@ -4,7 +4,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_EXPOSED_PORT:-6379}:6379"
     logging:
       driver: "json-file"
       options:
@@ -14,7 +14,7 @@ services:
       - redis-data:/data
 
   market-streamer:
-    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-streamer
     restart: unless-stopped
     command: ["python", "-m", "app.streamer.main"]

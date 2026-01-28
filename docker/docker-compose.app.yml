@@ -1,6 +1,6 @@
 services:
   trader:
-    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-trader
     restart: unless-stopped
     command: ["python", "main.py", "--server", "--verbose"]
@@ -18,7 +18,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   watcher:
-    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-watcher
     restart: unless-stopped
     command: ["python", "main.py", "--watch", "--verbose"]
@@ -36,7 +36,7 @@ services:
       - trader
 
   ui:
-    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:latest
+    image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-ui
     restart: unless-stopped
     working_dir: /app/dashboard

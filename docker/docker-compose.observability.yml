@@ -8,7 +8,7 @@ services:
       - "${LOKI_PORT:-3100}:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - ./docker/observability/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
       - loki-data:/tmp/loki
     logging:
       driver: "json-file"
@@ -21,7 +21,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-promtail
     restart: unless-stopped
     volumes:
-      - ./docker/observability/promtail-config.yaml:/etc/promtail/config.yml
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
@@ -42,9 +42,9 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_LOG_LEVEL=warn
     volumes:
-      - ./docker/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
-      - ./docker/observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
-      - ./docker/observability/dashboards:/var/lib/grafana/dashboards
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./observability/dashboards:/var/lib/grafana/dashboards
     logging:
       driver: "json-file"
       options:
@@ -58,7 +58,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-prometheus
     restart: unless-stopped
     volumes:
-      - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

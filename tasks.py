@@ -127,7 +127,7 @@ def deploy(c, env="demo", nuke=False, tag=True):
 
     print(f"--- 1. Syncing {env.upper()} Configs to {remote_host} ---")
     c.run(
-        f"ssh {remote_user}@{remote_host} 'mkdir -p {base_path}/docker/observability/dashboards'"
+        f"ssh {remote_user}@{remote_host} 'mkdir -p {base_path}/docker {base_path}/observability/dashboards'"
     )
 
     # Sync Compose Files
@@ -137,18 +137,22 @@ def deploy(c, env="demo", nuke=False, tag=True):
 
     # Sync Observability Configs
     c.run(
-        f"scp docker/observability/*.yaml {remote_user}@{remote_host}:{base_path}/docker/observability/"
+        f"scp docker/observability/*.yaml {remote_user}@{remote_host}:{base_path}/observability/"
     )
     c.run(
-        f"scp docker/observability/*.yml {remote_user}@{remote_host}:{base_path}/docker/observability/"
+        f"scp docker/observability/*.yml {remote_user}@{remote_host}:{base_path}/observability/"
     )
     c.run(
-        f"scp -r docker/observability/dashboards {remote_user}@{remote_host}:{base_path}/docker/observability/"
+        f"scp -r docker/observability/dashboards {remote_user}@{remote_host}:{base_path}/observability/"
     )
 
     # Sync Environment Variables (Sync .env.<env> to remote as .env)
     print(f"Syncing .env.{env} as .env...")
     c.run(f"scp .env.{env} {remote_user}@{remote_host}:{base_path}/.env")
+
+    # Get current git commit hash for tagging
+    git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
+    print(f"Deploying version: {git_sha}")
 
     print(f"\n--- 2. Orchestrating {env.upper()} Remote Stack ---")
 
@@ -156,15 +160,17 @@ def deploy(c, env="demo", nuke=False, tag=True):
     # We execute from the base_path where the .env file is located
     remote_cmd = (
         f"cd {base_path} && "
+        f"IMAGE_TAG={git_sha} "
+        f"ENV_FILE=.env "
         f"docker compose -p {env} "
         f"--env-file .env "
+        f"--project-directory . "
         f"-f docker/docker-compose.infra.yml "
         f"-f docker/docker-compose.app.yml "
         f"-f docker/docker-compose.observability.yml "
         f"-f docker/docker-compose.watchdog.yml "
         f"up -d --pull always --remove-orphans"
     )
-
     if nuke:
         print(f"NUKE MODE: Cleaning up existing {env} containers...")
         c.run(
@@ -188,12 +194,28 @@ def deploy(c, env="demo", nuke=False, tag=True):
 
 
 @task
-def logs(c, env="local", service=None, limit=100, host="local", follow=True):
+def logs(c, env="local", service=None, limit=100, host=None, follow=True):
     """
     Stream logs from Loki for a specific environment.
     """
+    # Alias prod -> live
+    if env == "prod":
+        env = "live"
+
+    # Default to prod host if env is live or demo, otherwise local
+    if host is None:
+        if env in ["live", "demo"]:
+            host = "prod"
+        else:
+            host = "local"
+    loki_port = 3100
     if host == "prod":
-        loki_base = "http://192.168.0.191:3100"  # TODO: Update if Demo Loki port differs and we want to access it
+        if env == "live":
+            loki_port = 3102
+        elif env == "demo":
+            loki_port = 3101
+
+        loki_base = f"http://192.168.0.191:{loki_port}"
     else:
         loki_base = "http://localhost:3100"
 
@@ -295,14 +317,22 @@ def publish(c):
     """
     registry = "192.168.0.191:5000"
     image_name = "trader-v2"
-    tag = "latest"
-    full_image_name = f"{registry}/{image_name}:{tag}"
+
+    # Get current git commit hash
     git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
-    print(f"Building {full_image_name} (SHA: {git_sha[:7]})...")
+
+    sha_tag = f"{registry}/{image_name}:{git_sha}"
+    latest_tag = f"{registry}/{image_name}:latest"
+
+    print(f"Building {sha_tag}...")
     c.run(
-        f"docker buildx build --build-arg GIT_COMMIT_SHA={git_sha} -t {full_image_name} --push ."
+        f"docker buildx build "
+        f"--build-arg GIT_COMMIT_SHA={git_sha} "
+        f"-t {sha_tag} "
+        f"-t {latest_tag} "
+        f"--push ."
     )
-    print(f"Successfully pushed {full_image_name}")
+    print(f"Successfully pushed {sha_tag} and {latest_tag}")
 
 
 @task
