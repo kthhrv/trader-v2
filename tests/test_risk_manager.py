@@ -55,13 +55,15 @@ async def test_dynamic_sizing_standard(risk_manager, base_signal):
 @pytest.mark.asyncio
 async def test_dynamic_sizing_minimum_violation(risk_manager, base_signal):
     """
-    Test rejection if calculated size is too small (< 0.5).
+    Test rejection if calculated size is too small (< 0.01).
     Balance: 100
     Risk%: 0.01 (1)
-    Distance: 10
-    Expected Size: 1 / 10 = 0.1 -> Reject
+    Distance: 200
+    Expected Size: 1 / 200 = 0.005 -> Reject
     """
     risk_manager.ig_client.get_account_balance.return_value = 100.0
+    base_signal.stop_loss = -100.0  # Entry 100 - (-100) = 200 distance
+    base_signal.atr = 0.0  # Prevent widening logic interference
 
     valid = await risk_manager.validate_signal(base_signal)
 

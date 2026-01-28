@@ -76,9 +76,9 @@ class RiskManager:
             f"Risk Check: Balance={balance:.2f}, MaxRisk={max_risk_amount:.2f}, Distance={distance:.2f}, TargetSize={target_size}"
         )
 
-        if target_size < 0.5:
+        if target_size < 0.01:
             logger.error(
-                f"Risk Violation: Calculated size {target_size} is below broker minimum (0.5). Stop distance might be too wide."
+                f"Risk Violation: Calculated size {target_size} is below broker minimum (0.01). Stop distance might be too wide."
             )
             return False
 
