@@ -1,3 +1,6 @@
+# Reflex build artifacts
+dashboard/.web
+
 # Local environment
 .venv
 node_modules

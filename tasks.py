@@ -127,7 +127,7 @@ def deploy(c, env="demo", nuke=False, tag=True):
 
     print(f"--- 1. Syncing {env.upper()} Configs to {remote_host} ---")
     c.run(
-        f"ssh {remote_user}@{remote_host} 'mkdir -p {base_path}/docker {base_path}/observability/dashboards'"
+        f"ssh {remote_user}@{remote_host} 'mkdir -p {base_path}/docker/observability/dashboards'"
     )
 
     # Sync Compose Files
@@ -137,40 +137,60 @@ def deploy(c, env="demo", nuke=False, tag=True):
 
     # Sync Observability Configs
     c.run(
-        f"scp docker/observability/*.yaml {remote_user}@{remote_host}:{base_path}/observability/"
+        f"scp docker/observability/*.yaml {remote_user}@{remote_host}:{base_path}/docker/observability/"
     )
     c.run(
-        f"scp docker/observability/*.yml {remote_user}@{remote_host}:{base_path}/observability/"
+        f"scp docker/observability/*.yml {remote_user}@{remote_host}:{base_path}/docker/observability/"
     )
     c.run(
-        f"scp -r docker/observability/dashboards {remote_user}@{remote_host}:{base_path}/observability/"
+        f"scp -r docker/observability/dashboards {remote_user}@{remote_host}:{base_path}/docker/observability/"
     )
+
+    # Get current git commit hash for tagging/deployment
+    git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
+    print(f"Deploying version: {git_sha}")
 
     # Sync Environment Variables (Sync .env.<env> to remote as .env)
     print(f"Syncing .env.{env} as .env...")
     c.run(f"scp .env.{env} {remote_user}@{remote_host}:{base_path}/.env")
 
-    # Get current git commit hash for tagging
-    git_sha = c.run("git rev-parse HEAD", hide=True).stdout.strip()
-    print(f"Deploying version: {git_sha}")
+    # Append dynamic deployment variables to remote .env
+    c.run(
+        f'ssh {remote_user}@{remote_host} \'echo "\n# --- Deployment Vars ---" >> {base_path}/.env && '
+        f'echo "IMAGE_NAME=trader-v2" >> {base_path}/.env && '
+        f'echo "IMAGE_TAG={git_sha}" >> {base_path}/.env\''
+    )
 
     print(f"\n--- 2. Orchestrating {env.upper()} Remote Stack ---")
 
-    # Remote command needs to use the correct project name and env file
-    # We execute from the base_path where the .env file is located
-    remote_cmd = (
+    # Generate a consolidated compose.yaml for Dockge/Portainer compatibility
+    # This flattens the 'include' directives into a single file the UI can parse.
+    files_flags = (
+        "-f docker/docker-compose.infra.yml "
+        "-f docker/docker-compose.app.yml "
+        "-f docker/docker-compose.observability.yml "
+        "-f docker/docker-compose.watchdog.yml"
+    )
+
+    # We must explicitly pass the env vars so 'docker compose config' can resolve them
+    # into the flattened file (baking them in).
+    config_cmd = (
         f"cd {base_path} && "
         f"IMAGE_TAG={git_sha} "
+        f"IMAGE_NAME=trader-v2 "
         f"ENV_FILE=.env "
-        f"docker compose -p {env} "
-        f"--env-file .env "
-        f"--project-directory . "
-        f"-f docker/docker-compose.infra.yml "
-        f"-f docker/docker-compose.app.yml "
-        f"-f docker/docker-compose.observability.yml "
-        f"-f docker/docker-compose.watchdog.yml "
-        f"up -d --pull always --remove-orphans"
+        f"docker compose --project-directory . --env-file .env {files_flags} config > {base_path}/compose.yaml"
     )
+    c.run(f"ssh {remote_user}@{remote_host} '{config_cmd}'")
+
+    # Run the stack using the consolidated file
+    # We still pass --env-file so the running containers have access to them if needed (runtime),
+    # even though build-time vars are baked in.
+    remote_cmd = (
+        f"cd {base_path} && "
+        f"docker compose -p {env} up -d --pull always --remove-orphans"
+    )
+
     if nuke:
         print(f"NUKE MODE: Cleaning up existing {env} containers...")
         c.run(

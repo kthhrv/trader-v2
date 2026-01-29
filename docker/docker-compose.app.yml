@@ -51,5 +51,8 @@ services:
         max-file: "3"
     env_file:
       - ${ENV_FILE:-.env}
+    environment:
+      - API_URL=http://192.168.0.191:${UI_API_PORT:-8020}
+      - REFLEX_API_URL=http://192.168.0.191:${UI_API_PORT:-8020}
     depends_on:
       - trader
