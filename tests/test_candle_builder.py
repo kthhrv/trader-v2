@@ -1,4 +1,5 @@
 import pytest
+import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 from app.streamer.candle_builder import CandleBuilder
@@ -9,7 +10,8 @@ async def test_candle_builder_aggregation():
     """
     Tests that ticks are correctly aggregated into 1m, 5m, and 15m candles.
     """
-    builder = CandleBuilder()
+    mock_redis = AsyncMock()
+    builder = CandleBuilder(mock_redis)
     epic = "TEST.EPIC"
 
     # Mock DB session
@@ -45,7 +47,12 @@ async def test_candle_builder_aggregation():
 
         # Check if save was called for 1m candle (from 10:00)
         assert mock_session.execute.called
-        # Verify it was an insert statement (can't easily check params on the complex Insert object)
+        # Verify it published to Redis
+        mock_redis.publish.assert_called()
+        args = mock_redis.publish.call_args[0]
+        assert args[0] == "market_candles"
+        payload = json.loads(args[1])
+        assert payload["event"] == "candle_closed"
 
         # Reset mock
         mock_session.execute.reset_mock()

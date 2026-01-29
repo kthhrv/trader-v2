@@ -1,4 +1,6 @@
 import logging
+import json
+import redis.asyncio as redis
 from datetime import datetime, timezone
 from typing import Dict
 from app.database.session import async_session_maker
@@ -10,9 +12,11 @@ logger = logging.getLogger(__name__)
 class CandleBuilder:
     """
     Aggregates ticks into 1m, 5m, and 15m candles and persists them.
+    Also publishes 'candle_closed' events to Redis.
     """
 
-    def __init__(self):
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
         # State: {epic: { '1m': {...}, '5m': {...}, '15m': {...} } }
         self.state: Dict[str, Dict[str, dict]] = {}
 
@@ -47,6 +51,10 @@ class CandleBuilder:
         if not current_data or current_bucket > current_data["timestamp"]:
             if current_data:
                 await self._save_candle(current_data, epic, resolution)
+
+                # Publish event for 1m candles (Sentinel Trigger)
+                if resolution == "MINUTE":
+                    await self._publish_candle_event(current_data, epic)
 
             # Init New
             self.state[epic][state_key] = {
@@ -94,3 +102,20 @@ class CandleBuilder:
                 )
         except Exception as e:
             logger.error(f"Failed to save {resolution} candle for {epic}: {e}")
+
+    async def _publish_candle_event(self, data: dict, epic: str):
+        """Publishes completed 1m candle to Redis for the Watcher/Sentinel."""
+        try:
+            payload = {
+                "event": "candle_closed",
+                "epic": epic,
+                "timestamp": data["timestamp"].isoformat(),
+                "open": data["open"],
+                "high": data["high"],
+                "low": data["low"],
+                "close": data["close"],
+                "volume": data["volume"],
+            }
+            await self.redis.publish("market_candles", json.dumps(payload))
+        except Exception as e:
+            logger.error(f"Failed to publish candle event for {epic}: {e}")

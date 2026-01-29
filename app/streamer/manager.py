@@ -28,7 +28,7 @@ class StreamManager:
             / "js"
             / "stream_service.js"
         )
-        self.candle_builder = CandleBuilder()
+        self.candle_builder = CandleBuilder(redis_client)
 
     async def start(self):
         """

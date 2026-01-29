@@ -1,14 +1,20 @@
 import pandas as pd
-import pandas_ta as ta
 from datetime import datetime, timezone
 from typing import Optional
 
 from app.core.logger import logger
 from app.services.market_data import MarketDataService
+from app.services.technical_analysis import TechnicalAnalysisService
 from app.adapters.news_client import NewsClient
 from app.adapters.gemini_service import GeminiService, TradingSignal
 from app.core.prompts import STRATEGY_PROMPTS
-from app.domain.models import MarketRegime, VolatilityRegime, TrendContext
+from app.domain.models import (
+    MarketRegime,
+    VolatilityRegime,
+    TrendContext,
+    MarketIndicators,
+    MarketState,
+)
 
 
 class MarketAnalyzer:
@@ -21,6 +27,7 @@ class MarketAnalyzer:
         self.market_data = market_data
         self.news_client = news_client
         self.gemini = gemini
+        # TechnicalAnalysisService is static, no instance needed
 
     async def analyze_market(
         self, market_key: str, config: dict, override_strategy: Optional[str] = None
@@ -67,11 +74,11 @@ class MarketAnalyzer:
         self, regime: MarketRegime, default_id: str, config: dict
     ) -> str:
         """
-        Selects the best strategy based on Market Regime (ADX, Volatility) and Time since open.
+        Selects the best strategy based on Market Regime (V3 Logic Matrix).
+        Hierarchy: Time -> Risk -> Technical.
         """
-        # 1. Time-Based Filter: Protect the Open
-        # If we are within 30 mins of the scheduled open, we ALWAYS use the default (Breakout/Volatility).
-        # This prevents pre-market low-vol data from falsely triggering Mean Reversion.
+        # 1. TIER 1: TEMPORAL OVERRIDE (The Open)
+        # If we are within -15m to +30m of the scheduled open, force default (usually us_volatility).
         schedule = config.get("schedule")
         market_tz = config.get("timezone", "UTC")
 
@@ -85,26 +92,25 @@ class MarketAnalyzer:
                 second=0,
                 microsecond=0,
             )
-
-            # If we are within 15 minutes BEFORE or 30 minutes AFTER the scheduled open time
+            # -15 mins to +30 mins
             time_since_open = (now_localized - market_open).total_seconds()
             if -900 <= time_since_open <= 1800:
                 logger.info(
-                    f"Market Open Phase ({int(time_since_open / 60)}m relative to open). Forcing default strategy."
+                    f"Market Open Phase ({int(time_since_open / 60)}m relative to open). Forcing Open Strategy."
                 )
                 return default_id
 
-        # 2. Regime-Based Switching (Post-Open)
-        # ADX < 20 implies a weak trend (Choppy/Range).
-        # Volatility Ratio < 0.8 implies compression (Range).
-        adx = regime.adx_14 or 0
-        is_choppy = (adx < 20) or (regime.volatility_ratio < 0.8)
+        # 2. TIER 2: SAFETY OVERRIDE (Parabolic/Climax)
+        if regime.state.is_parabolic:
+            logger.info("Regime is PARABOLIC. Switching to Climax Reversal.")
+            return "climax_reversal"
 
-        if is_choppy:
-            # In choppy markets, Breakout strategies fail. Use Mean Reversion.
+        # 3. TIER 3: TECHNICAL REGIME (Mid-Session)
+        # Choppy / Low Energy -> Mean Reversion
+        if regime.state.is_choppy:
             return "mean_reversion"
 
-        # 3. Default (Trend/Breakout)
+        # Default -> Trend/Breakout
         return default_id
 
     async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
@@ -112,64 +118,30 @@ class MarketAnalyzer:
         candles_15m = await self.market_data.get_latest_candles(epic, "MINUTE_15", 50)
         candles_5m = await self.market_data.get_latest_candles(epic, "MINUTE_5", 24)
         candles_1m = await self.market_data.get_latest_candles(epic, "MINUTE", 15)
-        # Increase daily history to 10 days to match V1
         candles_daily = await self.market_data.get_latest_candles(epic, "DAY", 10)
 
         if not candles_15m or len(candles_15m) < 20:
             logger.warning("Insufficient 15m data for analysis.")
             return None
 
-        # Fetch External Factors (VIX / Sentiment)
+        # Fetch External Factors
         vix_level = await self.market_data.get_vix_level()
         sentiment = await self.market_data.get_client_sentiment(epic)
 
-        # Indicators
+        # 1. Prepare Data
         df = pd.DataFrame([c.model_dump() for c in candles_15m])
         df.set_index("timestamp", inplace=True)
-        df["high"] = df["high"].astype(float)
-        df["low"] = df["low"].astype(float)
-        df["close"] = df["close"].astype(float)
 
-        try:
-            df["ATR"] = ta.atr(df["high"], df["low"], df["close"], length=14)
-            df["RSI"] = ta.rsi(df["close"], length=14)
-            df["EMA_20"] = ta.ema(df["close"], length=20)
+        # 2. Calculate Indicators (Delegated)
+        df = TechnicalAnalysisService.calculate_indicators(df)
 
-            # ADX Calculation (Returns a DataFrame with ADX_14, DMP_14, DMN_14)
-            adx_df = ta.adx(df["high"], df["low"], df["close"], length=14)
-            if adx_df is not None and "ADX_14" in adx_df.columns:
-                df["ADX"] = adx_df["ADX_14"]
-            else:
-                df["ADX"] = 0.0
-
-        except Exception as e:
-            logger.error(f"Indicator calculation error: {e}")
-            return None
-
-        # Format Trend Table (Last 50 periods with indicators)
-        # We simplify the columns to save tokens while keeping indicators
-        table_cols = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "RSI",
-            "ATR",
-            "ADX",
-            "EMA_20",
-        ]
-        # Ensure we only use columns that exist
-        available_cols = [c for c in table_cols if c in df.columns]
-        # Format index to show only HH:MM for clarity
-        df.index = pd.to_datetime(df.index)
-        display_df = df[available_cols].tail(50).copy()
-        display_df.index = display_df.index.strftime("%H:%M")
-        trend_table = display_df.to_string()
+        # 3. Calculate V3 Metrics
+        rvol = TechnicalAnalysisService.calculate_rvol(df)
+        slope = TechnicalAnalysisService.calculate_slope(df)
 
         latest = df.iloc[-1]
 
-        # Logic
+        # 4. Derived Values & Classification
         current_atr = latest["ATR"] if pd.notna(latest["ATR"]) else 0.0
         avg_atr = df["ATR"].mean()
         vol_ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
@@ -183,40 +155,77 @@ class MarketAnalyzer:
         ema = latest["EMA_20"] if pd.notna(latest["EMA_20"]) else latest["close"]
         trend = TrendContext.BULLISH if latest["close"] > ema else TrendContext.BEARISH
 
+        # Parabolic Check: Distance from EMA > 2.5x ATR
+        extension = 0.0
+        if current_atr > 0:
+            extension = (latest["close"] - ema) / current_atr
+
+        is_parabolic = abs(extension) > 2.5
+
+        # Choppy Check: ADX < 20 OR Low Volatility
+        adx = latest["ADX"] if pd.notna(latest["ADX"]) else 0.0
+        is_choppy = (adx < 20) or (vol_ratio < 0.8)
+
+        # Session & Gap Logic
         prev_close = 0.0
         if candles_daily and len(candles_daily) >= 2:
-            # Use second to last for prev close if today is included
-            # IG 'DAY' candle is today's live candle if market open.
             prev_close = candles_daily[-2].close
         elif len(candles_daily) == 1:
             prev_close = candles_daily[-1].open
 
-        gap_pct = 0.0
-        if prev_close > 0:
-            gap_pct = ((latest["close"] - prev_close) / prev_close) * 100
-
-        # Session Extremes (Today's High/Low)
-        # We can approximate this from the 15m/5m/1m data we have if they cover the session.
-        # But simpler is to assume 'candles_daily[-1]' is TODAY's candle if timestamp matches today.
-        session_high = None
-        session_low = None
-
-        if candles_daily:
-            today_candle = candles_daily[-1]
-            # Simple check if date matches
-            if today_candle.timestamp.date() == datetime.now(timezone.utc).date():
-                session_high = today_candle.high
-                session_low = today_candle.low
-
-        # Use 1m candle for current price if available (more timely), else 15m
         live_price = latest["close"]
         if candles_1m and len(candles_1m) > 0:
             live_price = candles_1m[-1].close
 
-        # Recalculate Gap with live price
         gap_pct = 0.0
         if prev_close > 0:
             gap_pct = ((live_price - prev_close) / prev_close) * 100
+
+        session_high = None
+        session_low = None
+        if candles_daily:
+            today_candle = candles_daily[-1]
+            if today_candle.timestamp.date() == datetime.now(timezone.utc).date():
+                session_high = today_candle.high
+                session_low = today_candle.low
+
+        # 5. Format Trend Table
+        table_cols = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "RSI",
+            "ATR",
+            "ADX",
+            "EMA_20",
+        ]
+        available_cols = [c for c in table_cols if c in df.columns]
+        # We need to preserve the dataframe for display but keep the original logic clean
+        display_df = df[available_cols].tail(50).copy()
+        display_df.index = pd.to_datetime(display_df.index).strftime("%H:%M")
+        trend_table = display_df.to_string()
+
+        # 6. Construct Nested Models
+        indicators = MarketIndicators(
+            atr_14=current_atr,
+            avg_atr=avg_atr,
+            rsi_14=latest["RSI"] if pd.notna(latest["RSI"]) else 50.0,
+            adx_14=adx,
+            ema_20=ema,
+            rvol=rvol,
+            ema_slope=slope,
+            extension_factor=extension,
+        )
+
+        state = MarketState(
+            trend=trend,
+            volatility=vol_regime,
+            volatility_ratio=vol_ratio,
+            is_parabolic=is_parabolic,
+            is_choppy=is_choppy,
+        )
 
         regime = MarketRegime(
             symbol=epic,
@@ -224,22 +233,16 @@ class MarketAnalyzer:
             current_price=live_price,
             daily_open=candles_daily[-1].open if candles_daily else latest["open"],
             prev_close=prev_close,
-            atr_14=current_atr,
-            avg_atr=avg_atr,
-            volatility_ratio=vol_ratio,
-            regime=vol_regime,
-            ema_20=ema,
-            trend=trend,
-            rsi_14=latest["RSI"] if pd.notna(latest["RSI"]) else 50.0,
-            adx_14=latest["ADX"] if pd.notna(latest["ADX"]) else 0.0,
             gap_percent=gap_pct,
+            session_high=session_high,
+            session_low=session_low,
+            indicators=indicators,
+            state=state,
+            vix_level=vix_level,
+            client_sentiment=sentiment,
             candles_5m=candles_5m,
             candles_1m=candles_1m,
             candles_daily=candles_daily,
-            vix_level=vix_level,
-            client_sentiment=sentiment,
-            session_high=session_high,
-            session_low=session_low,
             trend_table=trend_table,
         )
         return regime
@@ -258,15 +261,22 @@ class MarketAnalyzer:
             return "\\n".join(lines)
 
         now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Access nested properties
+        ind = regime.indicators
+        st = regime.state
+
         context = f"""
         Current Time (UTC): {now_utc}
         Instrument: {regime.symbol}
         Price: {regime.current_price}
-        Trend: {regime.trend} (EMA20: {regime.ema_20:.2f})
-        RSI: {regime.rsi_14:.2f}
-        ADX: {regime.adx_14:.2f} (Strength: {"Strong" if (regime.adx_14 or 0) > 25 else "Weak"})
-        ATR: {regime.atr_14:.2f} (Avg: {regime.avg_atr:.2f})
-        Volatility: {regime.regime} (Ratio: {regime.volatility_ratio:.2f})
+        Trend: {st.trend} (EMA20: {ind.ema_20:.2f} | Slope: {ind.ema_slope:.3f})
+        RSI: {ind.rsi_14:.2f}
+        ADX: {ind.adx_14:.2f} (Strength: {"Strong" if (ind.adx_14 or 0) > 25 else "Weak"})
+        ATR: {ind.atr_14:.2f} (Avg: {ind.avg_atr:.2f})
+        Volatility: {st.volatility} (Ratio: {st.volatility_ratio:.2f})
+        Volume: RVOL {ind.rvol:.2f} (Relative to 20p Avg)
+        Condition: {"PARABOLIC" if st.is_parabolic else "Normal"} (Extension: {ind.extension_factor:.2f}x ATR)
         Gap: {regime.gap_percent:+.2f}%
         """
 

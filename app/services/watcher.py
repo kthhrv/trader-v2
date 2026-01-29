@@ -1,110 +1,117 @@
 import asyncio
 import json
 import socket
-from collections import deque
 from datetime import datetime, timezone
 from typing import Dict, Optional
 import redis.asyncio as redis
+import pandas as pd
 
 from app.core.config import settings
 from app.core.logger import logger
 from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
 from app.services.market_status import MarketStatusService
+from app.services.technical_analysis import TechnicalAnalysisService
 
 
-class PriceSensor:
+class MetricSensor:
     """
-    Monitors Redis market data for volatility spikes.
+    Monitors 1m candles for V3 triggers (RVOL, Parabolic).
+    Acts as the 'Silent Sentinel'.
     """
 
     def __init__(self, notifier: HomeAssistantNotifier):
         self.notifier = notifier
         self.redis_client: Optional[redis.Redis] = None
-        # window: {epic: deque([ (timestamp, price), ... ])}
-        self.windows: Dict[str, deque] = {}
-        self.window_seconds = 60
-        self.threshold = 0.0015  # 0.15% spike threshold (Configurable)
+        # {epic: pd.DataFrame} - Rolling buffer of last 50 candles
+        self.history: Dict[str, pd.DataFrame] = {}
         self.cooldowns: Dict[str, datetime] = {}
-        self.cooldown_seconds = 300  # 5 minutes between alerts per market
+        self.cooldown_seconds = 300
         self.market_status = MarketStatusService()
 
-    async def on_tick(self, data: dict):
+    async def on_candle(self, data: dict):
         epic = data.get("epic")
-        bid = data.get("bid")
-        if not epic or not bid:
+        if not epic:
             return
 
-        bid = float(bid)
-        now = datetime.now(timezone.utc)
-
-        if epic not in self.windows:
-            self.windows[epic] = deque()
-
-        # 1. Update Window
-        self.windows[epic].append((now, bid))
-
-        # 2. Cleanup Old Ticks
-        while (
-            self.windows[epic]
-            and (now - self.windows[epic][0][0]).total_seconds() > self.window_seconds
-        ):
-            self.windows[epic].popleft()
-
-        # 3. Detect Spike
-        if len(self.windows[epic]) < 2:
-            return
-
-        start_price = self.windows[epic][0][1]
-        pct_change = (bid - start_price) / start_price
-
-        if abs(pct_change) >= self.threshold:
-            await self._trigger_alert(epic, pct_change, bid)
-
-    async def _trigger_alert(self, epic: str, change: float, current_price: float):
         # 0. Check Market Status
         if not self.market_status.is_market_open(epic):
-            logger.debug(f"Ignored spike for {epic} (Market Closed/Holiday)")
             return
 
+        # 1. Update Buffer
+        row = {
+            "timestamp": pd.to_datetime(data["timestamp"]),
+            "open": float(data["open"]),
+            "high": float(data["high"]),
+            "low": float(data["low"]),
+            "close": float(data["close"]),
+            "volume": float(data["volume"]),
+        }
+
+        if epic not in self.history:
+            self.history[epic] = pd.DataFrame([row])
+            self.history[epic].set_index("timestamp", inplace=True)
+        else:
+            new_df = pd.DataFrame([row])
+            new_df.set_index("timestamp", inplace=True)
+            self.history[epic] = pd.concat([self.history[epic], new_df])
+            # Keep last 50
+            if len(self.history[epic]) > 50:
+                self.history[epic] = self.history[epic].iloc[-50:]
+
+        df = self.history[epic]
+        if len(df) < 20:  # Need enough for averages
+            return
+
+        # 2. Run Math (Silent)
+        df = TechnicalAnalysisService.calculate_indicators(df)
+        rvol = TechnicalAnalysisService.calculate_rvol(df)
+
+        # 3. Check Triggers
+        triggers = []
+
+        # A. RVOL Spike
+        if rvol > 2.0:
+            triggers.append(f"RVOL_SPIKE_{rvol:.1f}x")
+
+        # B. Parabolic Extension
+        latest = df.iloc[-1]
+        ema = latest.get("EMA_20")
+        atr = latest.get("ATR")
+        if ema and atr and atr > 0:
+            extension = abs(latest["close"] - ema) / atr
+            if extension > 2.5:
+                triggers.append(f"PARABOLIC_EXT_{extension:.1f}x")
+
+        if triggers:
+            await self._trigger_bot(epic, triggers, latest["close"])
+
+    async def _trigger_bot(self, epic: str, triggers: list, price: float):
         now = datetime.now(timezone.utc)
         last_alert = self.cooldowns.get(epic)
-
         if last_alert and (now - last_alert).total_seconds() < self.cooldown_seconds:
-            return  # Quiet during cooldown
+            return
 
         self.cooldowns[epic] = now
+        reason = "+".join(triggers)
+        logger.info(f"SENTINEL TRIGGER: {epic} -> {reason}")
 
-        direction = "🚀 UP" if change > 0 else "🔻 DOWN"
-        market_name = next(
-            (m["name"] for m in MARKET_CONFIGS.values() if m["epic"] == epic), epic
+        market_key = next(
+            (k for k, v in MARKET_CONFIGS.items() if v["epic"] == epic), None
         )
-
-        title = f"VOLATILITY ALERT: {market_name}"
-        message = (
-            f"{direction} {abs(change) * 100:.2f}% in < 60s. Price: {current_price}"
-        )
-
-        logger.warning(f"SPIKE DETECTED: {message}")
-
-        # 1. Trigger Bot (Reflex) - Priority!
-        if self.redis_client:
+        if self.redis_client and market_key:
             payload = {
                 "command": "RUN_STRATEGY",
-                "market": next(
-                    (k for k, v in MARKET_CONFIGS.items() if v["epic"] == epic), None
-                ),
-                "reason": f"volatility_spike_{abs(change) * 100:.2f}pct",
-                "override_strategy": "volatility_response",
+                "market": market_key,
+                "reason": f"sentinel_{reason}",
             }
-            if payload["market"]:
-                # await self.redis_client.publish("trade_commands", json.dumps(payload))
-                logger.info(
-                    f"DRY RUN: Would have triggered Strategy for {payload['market']}"
-                )
+            await self.redis_client.publish("trade_commands", json.dumps(payload))
 
-        # 2. Send HA Notification (Background/Secondary)
-        await self.notifier.send_notification(title, message, priority="high")
+            # Send HA Notification
+            market_name = MARKET_CONFIGS[market_key]["name"]
+            title = f"SENTINEL: {market_name}"
+            msg = f"Trigger: {reason} at {price}"
+            await self.notifier.send_notification(title, msg, priority="high")
 
 
 class WatcherService:
@@ -114,7 +121,7 @@ class WatcherService:
 
     def __init__(self, notifier: HomeAssistantNotifier):
         self.notifier = notifier
-        self.price_sensor = PriceSensor(notifier)
+        self.metric_sensor = MetricSensor(notifier)
         self.redis_client: Optional[redis.Redis] = None
 
     async def start(self):
@@ -130,21 +137,23 @@ class WatcherService:
                     port=settings.REDIS_PORT,
                     decode_responses=True,
                 )
-                # Give sensor access to publisher for strategy triggers
-                self.price_sensor.redis_client = self.redis_client
+                self.metric_sensor.redis_client = self.redis_client
 
                 pubsub = self.redis_client.pubsub()
-                await pubsub.subscribe("market_data")
+                await pubsub.subscribe("market_candles")
 
                 logger.info(
-                    f"Watcher listening to Redis 'market_data' on {settings.REDIS_HOST}"
+                    f"Watcher listening to 'market_candles' on {settings.REDIS_HOST}"
                 )
 
                 async for message in pubsub.listen():
                     if message["type"] == "message":
                         try:
                             data = json.loads(message["data"])
-                            await self.price_sensor.on_tick(data)
+                            # Filter out heartbeat/start event if any
+                            if data.get("event") == "candle_closed":
+                                await self.metric_sensor.on_candle(data)
+
                         except json.JSONDecodeError:
                             continue
 
@@ -162,7 +171,6 @@ class WatcherService:
             finally:
                 if self.redis_client:
                     try:
-                        # Close the client and connection
                         await self.redis_client.close()
                     except Exception:
                         pass
