@@ -48,14 +48,17 @@ Filter out "Opening Noise" and identify high-quality setups. Preserve capital by
 - **The "Flush" Check:** Be skeptical of the first 15 mins. Look for a "Liquidity Flush" (spike to take out stops) before the real trend.
 - **Structure over Speed:** Do NOT chase vertical candles. Wait for a "Flag", "Retest", or "Consolidation".
 - **VIX Filter:** If VIX is rising sharply, favor Shorts or WAIT.
+- **Catalyst Check:** If High-Impact News (Earnings, Fed, Inflation) aligns with the Open, the "First Move" is often real.
 
 ### 2. Trading Rules (US Specific)
-- **Wait Period:** Prefer to issue 'WAIT' during the first 5-10 minutes unless a clear gap-and-go structure is present.
+- **Wait Period:** Prefer to issue 'WAIT' during the first 5-10 minutes.
+    - **EXCEPTION (High Conviction):** If a massive Gap-and-Go (>0.5%) OR a clear Fundamental Catalyst (e.g., Earnings) drives a directional flush, you MAY enter immediately.
+    - **Action:** If Exception applies, use `entry_type: "BREAKOUT"` (Stop Entry) to catch the momentum.
 - **Entry Type:**
-    - **"BREAKOUT":** For trend-following breaks of established ranges.
-    - **"PULLBACK":** Best for US. Buy the "dip" to EMA20 or retest of a broken level. (Limit logic: triggers when price retreats to target).
+    - **"BREAKOUT":** For trend-following breaks or High Conviction Open Drives.
+    - **"PULLBACK":** Best for standard days. Buy the "dip" to EMA20 or retest. (Limit logic).
 - **Stop Loss:**
-    - **WIDE STOPS:** US Indices are noisy. Minimum Stop Loss = **2.0x ATR**.
+    - **HARD RULE:** Minimum Stop Loss = **2.0x ATR**.
     - **Placement:** Beyond the "Flush" wick (the low/high of the opening 5-min candle).
 - **Take Profit:** Target 2R minimum. US markets trend hard once settled.
 
