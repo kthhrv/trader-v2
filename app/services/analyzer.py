@@ -208,10 +208,20 @@ class MarketAnalyzer:
                 session_high = today_candle.high
                 session_low = today_candle.low
 
+        # Use 1m candle for current price if available (more timely), else 15m
+        live_price = latest["close"]
+        if candles_1m and len(candles_1m) > 0:
+            live_price = candles_1m[-1].close
+
+        # Recalculate Gap with live price
+        gap_pct = 0.0
+        if prev_close > 0:
+            gap_pct = ((live_price - prev_close) / prev_close) * 100
+
         regime = MarketRegime(
             symbol=epic,
             timestamp=datetime.now(timezone.utc),
-            current_price=latest["close"],
+            current_price=live_price,
             daily_open=candles_daily[-1].open if candles_daily else latest["open"],
             prev_close=prev_close,
             atr_14=current_atr,
