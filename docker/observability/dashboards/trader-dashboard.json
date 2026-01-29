@@ -317,7 +317,7 @@
         {
           "datasource": "Loki",
           "editorMode": "code",
-          "expr": "sum by (level) (count_over_time({project=~\"trader-(app|infra|watchdog)\"} | json | __error__=\"\" [1m]))",
+          "expr": "sum by (level) (count_over_time({container=~\"^.*-(trader|watchdog|streamer|watcher|ui)$\"} | json | __error__=\"\" [1m]))",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"
@@ -355,7 +355,7 @@
         {
           "datasource": "Loki",
           "editorMode": "code",
-          "expr": "count_over_time({project=\"trader-app\"} |= \"Order Placed\" [24h])",
+          "expr": "count_over_time({container=~\"^.*-trader$\"} |= \"Order Placed\" [24h])",
           "legendFormat": "Orders Placed",
           "queryType": "instant",
           "refId": "A"
@@ -387,7 +387,7 @@
         {
           "datasource": "Loki",
           "editorMode": "code",
-          "expr": "{project=~\"trader-(app|infra|watchdog)\"} | json | __error__=\"\"",
+          "expr": "{container=~\"^.*-(trader|watchdog|streamer|watcher|ui)$\"} | json | __error__=\"\"",
           "queryType": "range",
           "refId": "A"
         }
