@@ -47,6 +47,7 @@ class AsyncIGClient:
     def __init__(self):
         self.sessions: Dict[str, httpx.AsyncClient] = {}
         self.auth_tokens: Dict[str, Dict[str, str]] = {}
+        self.current_account_id: Optional[str] = None
         self._lock = asyncio.Lock()
 
     async def __aenter__(self):
@@ -144,8 +145,9 @@ class AsyncIGClient:
                 )
 
                 account_info = response.json()
+                self.current_account_id = account_info.get("currentAccountId")
                 logger.info(
-                    f"Successfully authenticated {env_type}. Account: {account_info.get('currentAccountId')}"
+                    f"Successfully authenticated {env_type}. Account: {self.current_account_id}"
                 )
 
             except httpx.HTTPStatusError as e:
@@ -292,9 +294,22 @@ class AsyncIGClient:
             if not accounts:
                 return 0.0
 
+            target_account = None
+            if self.current_account_id:
+                for acc in accounts:
+                    if acc.get("accountId") == self.current_account_id:
+                        target_account = acc
+                        break
+
+            if not target_account:
+                logger.warning(
+                    f"Current account {self.current_account_id} not found in list. Using first account."
+                )
+                target_account = accounts[0]
+
             # The 'balance' field in the account object is itself a dictionary
             # containing 'balance', 'deposit', 'profitLoss', and 'available'.
-            balance_data = accounts[0].get("balance", {})
+            balance_data = target_account.get("balance", {})
             if isinstance(balance_data, dict):
                 return float(balance_data.get("balance", 0.0))
             return float(balance_data)
