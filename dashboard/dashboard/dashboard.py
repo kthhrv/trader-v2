@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import reflex as rx
 import plotly.graph_objects as go
 import pandas as pd
+import pandas_ta as ta  # noqa: F401
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
