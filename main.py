@@ -16,6 +16,7 @@ from app.cli.diagnostics import (
     run_countdown,
     run_recent_trades,
     run_scorecard,
+    run_regime_check,
 )
 
 
@@ -26,6 +27,9 @@ async def main():
         type=str,
         choices=list(MARKET_CONFIGS.keys()),
         help="Market key to trade",
+    )
+    parser.add_argument(
+        "--regime", action="store_true", help="Check Market Regime (V3) without trading"
     )
     parser.add_argument("--dry-run", action="store_true", help="Simulate trades")
     parser.add_argument(
@@ -197,6 +201,13 @@ async def main():
             logger.error("Please specify --market with --news")
             return
         await fetch_news_print(args.market)
+        return
+
+    if args.regime:
+        if not args.market:
+            logger.error("Please specify --market with --regime")
+            return
+        await run_regime_check(args.market)
         return
 
     # 3. Single Market Run (Interactive/One-off)

@@ -11,6 +11,76 @@ from app.core.markets import MARKET_CONFIGS
 from app.services.scorecard import ScorecardService
 
 
+async def run_regime_check(market_key: str):
+    """
+    Analyzes and prints the current V3 Market Regime for a given market.
+    """
+    from app.services.analyzer import MarketAnalyzer
+    from app.services.market_data import MarketDataService
+    from app.services.collector import CollectorService
+
+    logger.info(f"Checking Regime for {market_key}...")
+
+    config = MARKET_CONFIGS.get(market_key)
+    if not config:
+        logger.error(f"Invalid market: {market_key}")
+        return
+
+    epic = config["epic"]
+
+    # Initialize Stack
+    client = AsyncIGClient.get_instance()
+    collector = CollectorService(client)
+    market_data = MarketDataService(client, collector)
+    # We don't need news or gemini for just the regime calc
+    analyzer = MarketAnalyzer(market_data, None, None)  # type: ignore
+
+    try:
+        regime = await analyzer._build_market_regime(epic)
+
+        if not regime:
+            print("Failed to build regime (Insufficient data?)")
+            return
+
+        print(f"\n{'=' * 60}")
+        print(f"MARKET REGIME REPORT: {market_key.upper()} ({epic})")
+        print(f"{'=' * 60}")
+        print(f"Price:      {regime.current_price}")
+        print(f"Time (UTC): {regime.timestamp.strftime('%H:%M:%S')}")
+        print(f"{'-' * 60}")
+
+        ind = regime.indicators
+        st = regime.state
+
+        print(
+            f"Trend:      {st.trend} (EMA20: {ind.ema_20:.2f} | Slope: {ind.ema_slope:.3f})"
+        )
+        print(f"Volatility: {st.volatility} (Ratio: {st.volatility_ratio:.2f})")
+        print(
+            f"Condition:  {'PARABOLIC' if st.is_parabolic else 'Normal'} (Ext: {ind.extension_factor:.2f}x ATR)"
+        )
+        print(f"Choppy:     {st.is_choppy} (ADX: {ind.adx_14:.2f})")
+        print(f"Volume:     RVOL {ind.rvol:.2f}")
+        print(f"RSI:        {ind.rsi_14:.2f}")
+
+        # Sentinel Trigger Check
+        triggers = []
+        if ind.rvol > 2.0:
+            triggers.append(f"RVOL_SPIKE ({ind.rvol:.1f}x)")
+        if st.is_parabolic:
+            triggers.append(f"PARABOLIC ({ind.extension_factor:.1f}x)")
+
+        if triggers:
+            print(f"\n🚨 SENTINEL WOULD TRIGGER: {', '.join(triggers)}")
+        else:
+            print("\n✅ Sentinel Status: QUIET")
+
+        print(f"{'=' * 60}\n")
+
+    except Exception as e:
+        logger.exception(f"Regime check failed: {e}")
+
+
 async def run_scorecard():
     """
     Generates and prints the Performance Scorecard.
