@@ -126,6 +126,30 @@ async def test_strategy_engine_dry_run(mock_deps):
 
 
 @pytest.mark.asyncio
+async def test_strategy_engine_close_proximity(mock_deps, monkeypatch):
+    """
+    Verifies that the engine skips entries within 90 minutes of market close.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    mock_analyzer, mock_risk, mock_executor, mock_status = mock_deps
+    mock_status.is_holiday.return_value = False
+
+    # Mock Market Close to be 30 minutes from now
+    now_utc = datetime.now(timezone.utc)
+    mock_close = now_utc + timedelta(minutes=30)
+    mock_status.get_market_close_datetime.return_value = mock_close
+
+    engine = StrategyEngine(mock_analyzer, mock_risk, mock_executor, mock_status)
+
+    result = await engine.run_strategy("ftse")
+
+    assert result == "SKIPPED"  # StrategyResult.SKIPPED
+    mock_analyzer.analyze_market.assert_not_called()
+    mock_executor.execute_trade.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_strategy_engine_validation_fail(mock_deps, monkeypatch):
     mock_analyzer, mock_risk, mock_executor, mock_status = mock_deps
     mock_status.is_holiday.return_value = False

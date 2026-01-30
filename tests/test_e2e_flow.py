@@ -127,7 +127,7 @@ async def test_full_trading_flow_e2e_mocked_adapter():
     mock_status.is_holiday.return_value = False
     mock_status.get_market_close_datetime.return_value = datetime.now(
         timezone.utc
-    ) + timedelta(hours=1)
+    ) + timedelta(hours=2)
 
     # Instantiate Sub-Services
     risk_manager = RiskManager(mock_ig)

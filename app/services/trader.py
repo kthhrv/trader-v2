@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, Callable
+from datetime import datetime, timedelta
 from app.core.logger import logger
 from app.core.markets import MARKET_CONFIGS
 from app.adapters.gemini_service import TradingSignal, Action
@@ -50,6 +51,25 @@ class StrategyEngine:
                 f"Market {market_key} is closed (Holiday). Skipping strategy."
             )
             return StrategyResult.HOLIDAY
+
+        # 0.5 Check Market Close Proximity (No Entry Zone: 90 mins before close)
+        if config:
+            try:
+                close_time = self.market_status.get_market_close_datetime(
+                    config["epic"]
+                )
+                now_loc = datetime.now(close_time.tzinfo)
+                time_left = close_time - now_loc
+
+                if timedelta(seconds=0) < time_left < timedelta(minutes=90):
+                    logger.warning(
+                        f"Market closing soon ({time_left}). Skipping new entry (Risk: Low Liquidity/Force Close)."
+                    )
+                    return StrategyResult.SKIPPED
+            except Exception as e:
+                logger.warning(
+                    f"Could not check market close time for {market_key}: {e}"
+                )
 
         # 1. Analyze
         try:
