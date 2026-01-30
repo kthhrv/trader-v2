@@ -41,6 +41,7 @@ class StrategyEngine:
         confirmation_callback: Optional[Callable[[TradingSignal], bool]] = None,
         override_strategy: Optional[str] = None,
         trigger_source: str = "unknown",
+        session_id: Optional[str] = None,
     ) -> StrategyResult:
         """
         Orchestrates the strategy flow: Analyze -> Validate -> Execute.
@@ -75,7 +76,7 @@ class StrategyEngine:
         # 1. Analyze
         try:
             signal, signal_db = await self.generate_trade_signal(
-                market_key, override_strategy, trigger_source
+                market_key, override_strategy, trigger_source, session_id
             )
             if not signal:
                 return StrategyResult.ERROR
@@ -126,6 +127,7 @@ class StrategyEngine:
         market_key: str,
         override_strategy: Optional[str] = None,
         trigger_source: str = "unknown",
+        session_id: Optional[str] = None,
     ) -> tuple[Optional[TradingSignal], Optional[TradeSignal]]:
         config = MARKET_CONFIGS.get(market_key)
         if not config:
@@ -153,18 +155,24 @@ class StrategyEngine:
             signal,
             override_strategy or config.get("strategy_id", "unknown"),
             trigger_source,
+            session_id,
         )
 
         return signal, db_signal
 
     async def _save_signal(
-        self, signal: TradingSignal, strategy_name: str, trigger_source: str
+        self,
+        signal: TradingSignal,
+        strategy_name: str,
+        trigger_source: str,
+        session_id: Optional[str] = None,
     ) -> TradeSignal:
         async with db_session.async_session_maker() as session:
             db_signal = TradeSignal(
                 symbol=signal.ticker,
                 strategy_name=strategy_name,
                 trigger_source=trigger_source,
+                session_id=session_id,
                 signal_decision=signal.action.value,
                 confidence=signal.confidence,
                 reasoning=signal.reasoning,
@@ -181,10 +189,15 @@ class StrategyEngine:
             return db_signal
 
     async def save_manual_signal(
-        self, signal: TradingSignal, strategy_name: str
+        self,
+        signal: TradingSignal,
+        strategy_name: str,
+        session_id: Optional[str] = None,
     ) -> TradeSignal:
         """Public wrapper for _save_signal to allow manual/test signal persistence."""
-        return await self._save_signal(signal, strategy_name, trigger_source="manual")
+        return await self._save_signal(
+            signal, strategy_name, trigger_source="manual", session_id=session_id
+        )
 
     async def validate_signal(self, signal: TradingSignal) -> bool:
         return await self.risk_manager.validate_signal(signal)

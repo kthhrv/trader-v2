@@ -1,4 +1,6 @@
 import asyncio
+import uuid
+from typing import Optional
 from datetime import datetime
 import pandas as pd
 from sqlmodel import select
@@ -268,12 +270,16 @@ async def run_market_strategy(
     analyst_mode: bool = False,
     yes: bool = False,
     trigger_source: str = "manual",
+    session_id: Optional[str] = None,
 ):
     """
     Executes the trading strategy for a specific market with stalking support.
     """
+    if not session_id:
+        session_id = str(uuid.uuid4())
+
     logger.info(
-        f"Starting {market_key} strategy (Source: {trigger_source}, Dry Run: {dry_run}, Analyst: {analyst_mode}, Yes: {yes})..."
+        f"Starting {market_key} strategy (Session: {session_id}, Source: {trigger_source}, Dry Run: {dry_run}, Analyst: {analyst_mode}, Yes: {yes})..."
     )
 
     config = MARKET_CONFIGS.get(market_key)
@@ -305,6 +311,7 @@ async def run_market_strategy(
                     market_key,
                     confirmation_callback=confirmation_callback,
                     trigger_source=trigger_source,
+                    session_id=session_id,
                 )
 
                 # 2. Handle Result

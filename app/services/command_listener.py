@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from typing import Set
 import redis.asyncio as redis
 
@@ -80,8 +81,12 @@ class CommandListener:
             logger.info(log_msg)
 
             # Run the strategy (Analyst -> Execution)
+            session_id = str(uuid.uuid4())
             await self.engine.run_strategy(
-                market, override_strategy=override, trigger_source=reason
+                market,
+                override_strategy=override,
+                trigger_source=reason,
+                session_id=session_id,
             )
 
         except Exception as e:

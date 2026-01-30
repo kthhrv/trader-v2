@@ -80,11 +80,13 @@ async def analyze(env: str, limit: int):
                         reason = ex.signal.reasoning.replace("\n", " ")[:120]
                         print(f"  Reason: {reason}...")
 
-                        # Show Trigger Source if available (New Feature!)
+                        # Show Trigger Source if available
                         trigger = getattr(ex.signal, "trigger_source", "N/A")
-                        print(f"  Source: {trigger}")
+                        session_id = getattr(ex.signal, "session_id", "N/A")
+                        print(f"  Source: {trigger} | Session: {session_id}")
 
                     print("-" * 75)
+
             else:
                 print(f"No trades found in {env} DB.")
 

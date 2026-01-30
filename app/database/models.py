@@ -24,6 +24,16 @@ class TradeSignal(SQLModel, table=True):
         default="unknown",
         description="Source of the trigger (scheduler, sentinel_rvol, manual, etc)",
     )
+    session_id: Optional[str] = Field(
+        default=None,
+        index=True,
+        description="Unique ID to group signals within a strategy session",
+    )
+    session_id: Optional[str] = Field(
+        default=None,
+        index=True,
+        description="Unique ID to group signals within a strategy session",
+    )
 
     # Analysis
     signal_decision: str  # BUY, SELL, WAIT
