@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 
 import reflex as rx
 import plotly.graph_objects as go
@@ -26,6 +27,32 @@ from app.core.config import settings  # noqa: E402
 # fmt: on
 
 
+# --- Data Models ---
+class ActivityEvent(BaseModel):
+    time: str
+    dir: str
+    confidence: str
+    trigger: str
+    # Add other fields if needed for display in the table
+
+
+class SessionData(BaseModel):
+    id: str
+    market: str
+    strategy: str
+    status: str
+    pnl: float
+    pnl_str: str
+    pnl_color: str
+    time_display: str
+    event_count: int
+    latest_time: str
+    trade: Optional[Dict[str, Any]] = (
+        None  # Trade details can remain flexible or be typed
+    )
+    events: List[ActivityEvent]
+
+
 class State(rx.State):
     """The app state."""
 
@@ -43,6 +70,7 @@ class State(rx.State):
 
     # Tables
     activity_log: List[Dict[str, Any]] = []
+    grouped_activity: List[SessionData] = []  # Use Pydantic Model
     market_stats: List[Dict[str, Any]] = []
     funnel_data: List[Dict[str, Any]] = []
 
@@ -56,7 +84,6 @@ class State(rx.State):
 
     # Raw Candle Data (Serializable)
     raw_candles: List[Dict[str, Any]] = []
-
     is_loading: bool = False
 
     @rx.var
@@ -308,6 +335,7 @@ class State(rx.State):
         # Update Heartbeat
         await self.check_heartbeat()
 
+        # ... (Scorecard/Stats logic remains same) ...
         stats = await ScorecardService.get_scorecard_data()
         if stats:
             pnl = stats.get("net_pnl", 0.0)
@@ -356,31 +384,44 @@ class State(rx.State):
                 },
             ]
 
-        raw_activity = await get_recent_signals_with_executions(limit=50)
-        processed_log = []
-        for signal, execution in raw_activity:
+        # Fetch and Group Activity
+        raw_activity = await get_recent_signals_with_executions(
+            limit=100
+        )  # Increased limit
+
+        # Helper to format item
+        def format_item(signal, execution):
             market = signal.symbol
+            # Map epic to short key (e.g. FTSE)
+            market_short = next(
+                (k for k, v in MARKET_CONFIGS.items() if v["epic"] == market), market
+            ).upper()
+
             decimals = 2 if any(x in market for x in ["SPX", "US500", "SPTRD"]) else 1
 
             item = {
                 "id": signal.id,
-                "market": market,
+                "market": market_short,
                 "strategy": signal.strategy_name,
                 "confidence": signal.confidence,
                 "reasoning": signal.reasoning,
                 "symbol": market,
                 "signal_time": signal.timestamp.isoformat(),
+                "session_id": getattr(signal, "session_id", None)
+                or f"legacy_{signal.id}",
+                "trigger": getattr(signal, "trigger_source", "unknown"),
             }
 
             if execution:
                 item.update(
                     {
-                        "time": execution.fill_time.strftime("%Y-%m-%d %H:%M"),
+                        "time": execution.fill_time.strftime("%H:%M"),
                         "dir": execution.direction,
                         "entry": f"{execution.fill_price:.{decimals}f}",
                         "exit": f"{execution.exit_price:.{decimals}f}"
                         if execution.exit_price
                         else "Active",
+                        "pnl_val": execution.pnl or 0.0,
                         "pnl": f"£{execution.pnl or 0.0:.2f}",
                         "status": execution.outcome_status,
                         "fill_time": execution.fill_time.isoformat(),
@@ -390,12 +431,13 @@ class State(rx.State):
                         "fill_price": execution.fill_price,
                         "exit_price": execution.exit_price,
                         "sl": execution.initial_stop_loss,
+                        "is_trade": True,
                     }
                 )
             else:
                 item.update(
                     {
-                        "time": signal.timestamp.strftime("%Y-%m-%d %H:%M"),
+                        "time": signal.timestamp.strftime("%H:%M"),
                         "dir": signal.signal_decision
                         if signal.signal_decision != "WAIT"
                         else "-",
@@ -403,7 +445,8 @@ class State(rx.State):
                         if signal.entry_price
                         else "-",
                         "exit": "-",
-                        "pnl": "£0.00",
+                        "pnl_val": 0.0,
+                        "pnl": "-",
                         "status": "WAIT"
                         if signal.signal_decision == "WAIT"
                         else "SKIPPED",
@@ -411,11 +454,107 @@ class State(rx.State):
                         "fill_price": signal.entry_price,
                         "exit_time": None,
                         "exit_price": None,
+                        "is_trade": False,
                     }
                 )
-            processed_log.append(item)
+            return item
 
-        self.activity_log = processed_log
+        # Grouping Logic
+        sessions_map = {}
+        for signal, execution in raw_activity:
+            item = format_item(signal, execution)
+            sid = item["session_id"]
+
+            if sid not in sessions_map:
+                sessions_map[sid] = {
+                    "id": sid,
+                    "market": item["market"],
+                    "strategy": item["strategy"],
+                    "start_time": item["time"],
+                    "events": [],
+                    "trade": None,
+                    "pnl": 0.0,
+                    "status": "WAIT",
+                    "event_count": 0,
+                    "trigger": item["trigger"],
+                }
+
+            session = sessions_map[sid]
+            # Add to events list (Keep full dict for now, convert later)
+            session["events"].append(item)
+            session["event_count"] += 1
+
+            # ... (priority logic remains) ...
+            current_status_priority = {
+                "WAIT": 0,
+                "SKIPPED": 1,
+                "OPEN": 2,
+                "WIN": 3,
+                "LOSS": 4,
+                "BREAKEVEN": 3,
+            }
+            new_prio = current_status_priority.get(item["status"], 0)
+            curr_prio = current_status_priority.get(session["status"], 0)
+
+            if new_prio > curr_prio:
+                session["status"] = item["status"]
+
+            if item.get("is_trade"):
+                session["trade"] = item
+                session["pnl"] = item["pnl_val"]
+
+        # Finalize List (Convert map to list and sort by time)
+        final_list = []
+        for s in sessions_map.values():
+            # Sort events desc inside session (latest first)
+            s["events"].sort(key=lambda x: x["signal_time"], reverse=True)
+
+            # Convert events to Pydantic
+            pydantic_events = [
+                ActivityEvent(
+                    time=e["time"],
+                    dir=e["dir"],
+                    confidence=e["confidence"],
+                    trigger=e["trigger"],
+                )
+                for e in s["events"]
+            ]
+
+            # Set session time to latest event time
+            latest_time = s["events"][0]["signal_time"]
+            time_display = datetime.fromisoformat(latest_time).strftime(
+                "%Y-%m-%d %H:%M"
+            )
+            pnl_str = f"£{s['pnl']:.2f}"
+            pnl_color = "green" if s["pnl"] > 0 else ("red" if s["pnl"] < 0 else "gray")
+
+            # Create SessionData object
+            session_obj = SessionData(
+                id=s["id"],
+                market=s["market"],
+                strategy=s["strategy"],
+                status=s["status"],
+                pnl=s["pnl"],
+                pnl_str=pnl_str,
+                pnl_color=pnl_color,
+                time_display=time_display,
+                event_count=s["event_count"],
+                trade=s["trade"],
+                events=pydantic_events,
+                latest_time=latest_time,  # Helper field, not in model? Add to model or sort before.
+            )
+
+            # Sort requires a key. We can't sort the Pydantic objects easily in the list comprehension
+            # if we don't put the sort key in the model.
+            # I'll add latest_time to the model or sort the list of dicts first (which I did).
+
+            final_list.append((latest_time, session_obj))
+
+        # Sort sessions by latest time desc
+        final_list.sort(key=lambda x: x[0], reverse=True)
+
+        self.grouped_activity = [x[1] for x in final_list]
+        # self.activity_log = processed_log # Removed to avoid error
         self.is_loading = False
 
     async def select_trade(self, item: Any):
@@ -424,7 +563,7 @@ class State(rx.State):
         self.has_selection = True
 
         # Fetch Candle Data
-        symbol = item["market"]
+        symbol = item["symbol"]
         fill_time_str = item.get("fill_time") or item.get("signal_time")
         if not fill_time_str:
             self.raw_candles = []
@@ -490,6 +629,118 @@ def metric_card(
         variant="surface",
         width="100%",
         background_color="rgba(30, 33, 48, 0.5)",
+    )
+
+
+def render_session_card(session: SessionData):
+    return rx.card(
+        rx.vstack(
+            # Card Header
+            rx.hstack(
+                rx.vstack(
+                    rx.text(session.market, font_weight="bold", size="3"),
+                    rx.text(session.strategy, size="1", color="gray.400"),
+                    align_items="start",
+                    spacing="0",
+                ),
+                rx.spacer(),
+                rx.vstack(
+                    rx.hstack(
+                        rx.cond(
+                            session.pnl != 0,
+                            rx.text(
+                                session.pnl_str,
+                                font_weight="bold",
+                                color=session.pnl_color,
+                            ),
+                        ),
+                        rx.cond(
+                            session.trade,
+                            rx.button(
+                                "View Details",
+                                on_click=State.select_trade(session.trade),  # type: ignore
+                                variant="soft",
+                                size="1",
+                            ),
+                        ),
+                        rx.badge(
+                            session.status,
+                            color_scheme=rx.cond(
+                                session.status == "WIN",
+                                "green",
+                                rx.cond(
+                                    session.status == "LOSS",
+                                    "red",
+                                    rx.cond(
+                                        session.status == "OPEN",
+                                        "blue",
+                                        rx.cond(
+                                            session.status == "WAIT", "gray", "orange"
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            variant="surface",
+                        ),
+                        align_items="center",
+                        spacing="2",
+                    ),
+                    rx.text(session.time_display, size="1", color="gray.500"),
+                    align_items="end",
+                    spacing="1",
+                ),
+                width="100%",
+                align_items="center",
+            ),
+            # Accordion for Timeline (Minimalist)
+            rx.accordion.root(
+                rx.accordion.item(
+                    header=rx.text(
+                        f"Show Timeline ({session.event_count} events)",
+                        size="1",
+                        color="gray.500",
+                        _hover={"color": "gray.300"},
+                    ),
+                    content=rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Time"),
+                                    rx.table.column_header_cell("Signal"),
+                                    rx.table.column_header_cell("Conf"),
+                                    rx.table.column_header_cell("Source"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(
+                                    session.events,
+                                    lambda e: rx.table.row(
+                                        rx.table.cell(e.time, color="gray.400"),
+                                        rx.table.cell(e.dir),
+                                        rx.table.cell(e.confidence),
+                                        rx.table.cell(e.trigger, color="gray.400"),
+                                    ),
+                                )
+                            ),
+                            size="1",
+                            variant="ghost",
+                            width="100%",
+                        ),
+                        padding_top="1",
+                    ),
+                ),
+                type="multiple",
+                width="100%",
+                variant="ghost",
+            ),
+            spacing="1",
+            align_items="stretch",
+        ),
+        width="100%",
+        margin_bottom="1",
+        padding_y="2",
+        padding_x="3",
+        size="1",
     )
 
 
@@ -616,54 +867,7 @@ def index() -> rx.Component:
                 ),
                 rx.tabs.content(
                     rx.vstack(
-                        rx.table.root(
-                            rx.table.header(
-                                rx.table.row(
-                                    rx.table.column_header_cell("Time"),
-                                    rx.table.column_header_cell("Market"),
-                                    rx.table.column_header_cell("Dir"),
-                                    rx.table.column_header_cell("Entry"),
-                                    rx.table.column_header_cell("PnL"),
-                                    rx.table.column_header_cell("Status"),
-                                    rx.table.column_header_cell("Actions"),
-                                )
-                            ),
-                            rx.table.body(
-                                rx.foreach(
-                                    State.activity_log,
-                                    lambda item: rx.table.row(
-                                        rx.table.cell(item["time"]),
-                                        rx.table.cell(item["market"]),
-                                        rx.table.cell(item["dir"]),
-                                        rx.table.cell(item["entry"]),
-                                        rx.table.cell(item["pnl"]),
-                                        rx.table.cell(item["status"]),
-                                        rx.table.cell(
-                                            rx.hstack(
-                                                rx.button(
-                                                    "👁️",
-                                                    on_click=lambda: State.select_trade(
-                                                        item
-                                                    ),  # type: ignore
-                                                    variant="ghost",
-                                                    size="1",
-                                                ),
-                                                rx.button(
-                                                    "🗑️",
-                                                    on_click=lambda: State.ask_delete(
-                                                        item["id"]
-                                                    ),  # type: ignore
-                                                    variant="ghost",
-                                                    color_scheme="ruby",
-                                                    size="1",
-                                                ),
-                                            )
-                                        ),
-                                    ),
-                                )
-                            ),
-                            width="100%",
-                        ),
+                        rx.foreach(State.grouped_activity, render_session_card),
                         # Trade Details Modal
                         rx.dialog.root(
                             rx.dialog.content(
