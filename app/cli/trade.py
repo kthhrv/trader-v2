@@ -263,13 +263,17 @@ def confirm_trade(signal: TradingSignal) -> bool:
 
 
 async def run_market_strategy(
-    market_key: str, dry_run: bool, analyst_mode: bool = False, yes: bool = False
+    market_key: str,
+    dry_run: bool,
+    analyst_mode: bool = False,
+    yes: bool = False,
+    trigger_source: str = "manual",
 ):
     """
     Executes the trading strategy for a specific market with stalking support.
     """
     logger.info(
-        f"Starting {market_key} strategy (Dry Run: {dry_run}, Analyst: {analyst_mode}, Yes: {yes})..."
+        f"Starting {market_key} strategy (Source: {trigger_source}, Dry Run: {dry_run}, Analyst: {analyst_mode}, Yes: {yes})..."
     )
 
     config = MARKET_CONFIGS.get(market_key)
@@ -298,7 +302,9 @@ async def run_market_strategy(
             while True:
                 # 1. Run Strategy
                 result = await engine.run_strategy(
-                    market_key, confirmation_callback=confirmation_callback
+                    market_key,
+                    confirmation_callback=confirmation_callback,
+                    trigger_source=trigger_source,
                 )
 
                 # 2. Handle Result

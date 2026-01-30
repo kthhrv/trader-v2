@@ -20,6 +20,10 @@ class TradeSignal(SQLModel, table=True):
     # Context
     symbol: str = Field(index=True)
     strategy_name: str
+    trigger_source: str = Field(
+        default="unknown",
+        description="Source of the trigger (scheduler, sentinel_rvol, manual, etc)",
+    )
 
     # Analysis
     signal_decision: str  # BUY, SELL, WAIT

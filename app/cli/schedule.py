@@ -48,7 +48,13 @@ async def run_scheduler(dry_run: bool):
             scheduler.add_job(
                 run_market_strategy,
                 trigger,
-                args=[market_key, dry_run, False, True],  # analyst_mode=False, yes=True
+                args=[
+                    market_key,
+                    dry_run,
+                    False,
+                    True,
+                    "scheduler",
+                ],  # analyst_mode=False, yes=True, source=scheduler
                 id=f"strategy_{market_key}",
                 replace_existing=True,
             )

@@ -80,7 +80,9 @@ class CommandListener:
             logger.info(log_msg)
 
             # Run the strategy (Analyst -> Execution)
-            await self.engine.run_strategy(market, override_strategy=override)
+            await self.engine.run_strategy(
+                market, override_strategy=override, trigger_source=reason
+            )
 
         except Exception as e:
             logger.error(f"Strategy execution failed for {market}: {e}")
