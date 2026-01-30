@@ -19,7 +19,7 @@ graph LR
 
 ## Features
 
-1.  **Replay Mode:** Load a CSV of 1-minute candles (e.g., from `yfinance`) and interpolate ticks.
+1.  **Replay Mode:** Load historical candles directly from the `historical_candles` database table. Replay exact market conditions (including crashes/gaps) tick-by-tick.
 2.  **Synthetic Mode (Chaos):** Generate purely random price movements (Random Walk / Geometric Brownian Motion) to simulate infinite market activity. Control volatility parameters to induce "Crashes" or "Rallies" on demand.
 3.  **Tick Generation:** 
     *   *Replay:* Constrained random walk between Open/High/Low/Close of historical candles.
@@ -29,28 +29,24 @@ graph LR
 ## Implementation Details
 
 ### 1. Data Sources
-*   **Historical:** `yfinance` for realistic patterns.
-*   **Synthetic:** Math-based generator (`price = last_price * (1 + drift + shock)`).
+*   **Historical:** `trader_live` database (Table: `historical_candles`).
+*   **Synthetic:** Math-based generator.
 
-### 2. The Loop (Synthetic Example)
+### 2. The Loop (Replay Example)
 ```python
-price = 10000.0
-volatility = 0.0001 # 0.01% per tick
+# Fetch from DB
+stmt = select(HistoricalCandle).where(symbol=epic).order_by(timestamp)
+candles = session.exec(stmt).all()
 
-while True:
-    # 1. Generate Tick
-    change = random.gauss(0, volatility)
-    price = price * (1 + change)
+for candle in candles:
+    # 1. Publish Candle Event (Sentinel)
+    publish_candle_event(candle)
     
-    publish_tick(price)
-    
-    # 2. Aggregate Candle
-    current_candle.update(price)
-    if time.time() - start_time > 60: # Scaled time
-        publish_candle(current_candle)
-        current_candle.reset()
-        
-    time.sleep(0.1) # Speed control
+    # 2. Fabricate Ticks (Trader)
+    ticks = generate_fractal_ticks(candle.open, candle.high, candle.low, candle.close)
+    for tick in ticks:
+        publish_tick(tick)
+        time.sleep(60 / speed / len(ticks))
 ```
 
 ### 3. Redis Protocol
