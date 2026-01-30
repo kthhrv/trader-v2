@@ -126,9 +126,25 @@ async def main():
 
     args = parser.parse_args()
 
+    # Determine if we want Human Readable logs (overriding JSON even in Docker)
+    is_interactive = (
+        args.regime
+        or args.analyst
+        or args.news
+        or args.news_check
+        or args.scorecard
+        or args.countdown
+        or args.recent_trades is not None
+        or args.test_trade
+        or args.sync_trade
+        or args.post_mortem
+    )
+
     # 0. Configure Logging
-    configure_logging(args.verbose)
-    logger.info(f"Trader V2 Startup | Build: {settings.GIT_COMMIT_SHA}")
+    configure_logging(args.verbose, human_readable=is_interactive)
+
+    if not is_interactive:
+        logger.info(f"Trader V2 Startup | Build: {settings.GIT_COMMIT_SHA}")
 
     # Enable HA Notifications (Critical Alerts)
     enable_notification_handler()

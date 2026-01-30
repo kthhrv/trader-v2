@@ -7,27 +7,31 @@ from loguru import logger
 logger.remove()
 
 
-def configure_logging(verbose: bool = False):
+def configure_logging(verbose: bool = False, human_readable: bool = False):
     """
     Configures the console logger level.
-    In Docker: Always INFO
+    In Docker: Always INFO and JSON (unless human_readable=True)
     Local: INFO if verbose, else WARNING
     """
     # Detect Docker environment
     is_docker = os.environ.get("RUNNING_IN_DOCKER", "false").lower() == "true"
 
-    if is_docker:
+    if is_docker and not human_readable:
         level = "INFO"
         # Use JSON serialization for Docker/Loki
         logger.add(sys.stderr, level=level, serialize=True)
     else:
-        level = "INFO" if verbose else "WARNING"
-        # Use human-readable format for local dev
-        logger.add(
-            sys.stderr,
-            level=level,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-        )
+        # Human Readable Mode (Local or Forced)
+        level = "INFO" if (verbose or human_readable) else "WARNING"
+
+        # Simplified format for Human Mode (less clutter)
+        fmt = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
+
+        # Use detailed format for Local Dev verbose
+        if verbose and not is_docker:
+            fmt = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+
+        logger.add(sys.stderr, level=level, format=fmt)
 
 
 def enable_notification_handler():
