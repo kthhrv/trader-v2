@@ -15,22 +15,42 @@ Modify `StreamerService.stream(epic)` to subscribe to multiple Redis channels:
 *   `market_data`: Real-time prices (Existing).
 *   `trade_commands`: Control signals (Sentinel triggers, Manual overrides).
 
-### 2. Event Model
-Standardize the output of the generator:
+### 2. Event Model (Strictly Typed)
+Use Pydantic models (discriminated union) to ensure type safety within the handling loops.
+
 ```python
-{
-    "type": "PRICE" | "SENTINEL" | "COMMAND",
-    "payload": { ... },
-    "epic": "...",
-    "timestamp": "..."
-}
+class EventType(str, Enum):
+    PRICE = "PRICE"
+    SENTINEL = "SENTINEL"
+    COMMAND = "COMMAND"
+
+class BaseEvent(BaseModel):
+    timestamp: datetime
+    epic: str
+
+class PriceEvent(BaseEvent):
+    type: Literal[EventType.PRICE] = EventType.PRICE
+    bid: float
+    offer: float
+
+class SentinelEvent(BaseEvent):
+    type: Literal[EventType.SENTINEL] = EventType.SENTINEL
+    trigger: str
+    severity: str # "HIGH", "MEDIUM"
+
+class CommandEvent(BaseEvent):
+    type: Literal[EventType.COMMAND] = EventType.COMMAND
+    action: str # "CANCEL", "FORCE_EXIT"
+
+# Union Type for easy parsing
+TraderEvent = Union[PriceEvent, SentinelEvent, CommandEvent]
 ```
 
 ### 3. Loop Logic Updates
-Update `TradeExecutor` methods to handle new event types:
+Update `TradeExecutor` methods to handle typed events:
 
 *   **`_wait_for_trigger` (Stalking):**
-    *   If `type == SENTINEL` AND `direction != signal.direction`: **ABORT**.
+    *   `if isinstance(event, SentinelEvent)` AND `direction != signal.direction`: **ABORT**.
     *   If `type == COMMAND` AND `action == CANCEL`: **ABORT**.
 
 *   **`_monitor_position` (Live):**
