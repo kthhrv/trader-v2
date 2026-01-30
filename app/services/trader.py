@@ -142,7 +142,7 @@ class StrategyEngine:
 
         logger.info(f"Generating Signal for {config['name']}...")
         signal = await self.analyzer.analyze_market(
-            market_key, config, override_strategy
+            market_key, config, override_strategy, trigger_source=trigger_source
         )
 
         if not signal:

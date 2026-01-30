@@ -30,7 +30,11 @@ class MarketAnalyzer:
         # TechnicalAnalysisService is static, no instance needed
 
     async def analyze_market(
-        self, market_key: str, config: dict, override_strategy: Optional[str] = None
+        self,
+        market_key: str,
+        config: dict,
+        override_strategy: Optional[str] = None,
+        trigger_source: str = "unknown",
     ) -> Optional[TradingSignal]:
         """
         Full analysis pipeline: Data -> Indicators -> News -> AI -> Signal.
@@ -38,7 +42,7 @@ class MarketAnalyzer:
         epic = config["epic"]
 
         # 1. Build Regime
-        regime = await self._build_market_regime(epic)
+        regime = await self._build_market_regime(epic, trigger_source)
         if not regime:
             logger.error("Failed to build market regime.")
             return None
@@ -113,7 +117,9 @@ class MarketAnalyzer:
         # Default -> Trend/Breakout
         return default_id
 
-    async def _build_market_regime(self, epic: str) -> Optional[MarketRegime]:
+    async def _build_market_regime(
+        self, epic: str, trigger_source: str = "unknown"
+    ) -> Optional[MarketRegime]:
         # Fetch Data
         candles_15m = await self.market_data.get_latest_candles(epic, "MINUTE_15", 50)
         candles_5m = await self.market_data.get_latest_candles(epic, "MINUTE_5", 24)
@@ -161,6 +167,17 @@ class MarketAnalyzer:
             extension = (latest["close"] - ema) / current_atr
 
         is_parabolic = abs(extension) > 2.5
+
+        # --- Trust Sentinel Override ---
+        if "PARABOLIC" in trigger_source:
+            logger.warning(
+                f"Sentinel Override: Forcing PARABOLIC state for {epic} (Source: {trigger_source})"
+            )
+            is_parabolic = True
+            # Force high extension factor for prompt consistency if 15m chart lags
+            if abs(extension) < 2.5:
+                extension = 3.0 if extension >= 0 else -3.0
+        # -------------------------------
 
         # Choppy Check: ADX < 20 OR Low Volatility
         adx = latest["ADX"] if pd.notna(latest["ADX"]) else 0.0
