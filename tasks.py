@@ -398,3 +398,23 @@ def seed(c):
     """
     print("Seeding database with demo data...")
     c.run("PYTHONPATH=. uv run python app/database/seeder.py")
+
+
+@task
+def cmd(c, env="demo", args=""):
+    """
+    Run an arbitrary command inside the remote trader container.
+    Usage: inv cmd --env=demo --args="--regime --market ftse"
+    """
+    remote_host = "192.168.0.191"
+    remote_user = "root"
+
+    # Construct the remote command
+    container_name = f"{env}-trader"
+    remote_cmd = f"docker exec -it {container_name} python main.py {args}"
+
+    print(f"--- Running on {env.upper()} ({remote_host}): {args} ---")
+
+    # Use pty=True for interactive output (colors, progress bars, etc)
+    # ssh -t forces pseudo-tty allocation
+    c.run(f"ssh -t {remote_user}@{remote_host} '{remote_cmd}'", pty=True)
