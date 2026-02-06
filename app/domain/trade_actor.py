@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
 class TradeState(str, Enum):
@@ -53,6 +53,62 @@ class TradeActor:
                 # No transitions from CLOSED
             }
         }
+
+    def on_price_update(self, current_price: float) -> Optional[Dict[str, Any]]:
+        """
+        Calculates if any action is needed based on the new price.
+        Returns a dict describing the action (e.g. {"type": "MODIFY_STOP", "new_stop": ...})
+        or None if no action is needed.
+        """
+        if self.state != TradeState.OPEN:
+            return None
+
+        cfg = self.config
+        direction = cfg.get("direction")
+        entry_price = cfg.get("entry_price")
+        current_stop = cfg.get("current_stop")
+        initial_stop = cfg.get("initial_stop")
+        
+        if not all([direction, entry_price, current_stop, initial_stop]):
+            return None
+
+        risk_distance = abs(entry_price - initial_stop)
+        breakeven_r = cfg.get("breakeven_r", 1.5)
+        trail_distance = cfg.get("trail_distance")
+        step_size = cfg.get("step_size", 0.1)
+
+        # Logic State
+        # We determine "moved_to_breakeven" by checking if current_stop is better than or equal to entry
+        moved_to_breakeven = False
+        if direction == "BUY":
+            moved_to_breakeven = current_stop >= entry_price
+        else:
+            moved_to_breakeven = current_stop <= entry_price
+
+        # Rule 1: Check for Breakeven Trigger
+        if not moved_to_breakeven and risk_distance > 0:
+            profit_dist = (current_price - entry_price) if direction == "BUY" else (entry_price - current_price)
+            
+            if profit_dist >= (breakeven_r * risk_distance):
+                new_stop = entry_price
+                return {"type": "MODIFY_STOP", "new_stop": new_stop}
+
+        # Rule 2: Dynamic Trailing (Only AFTER Breakeven)
+        if moved_to_breakeven and trail_distance:
+            new_stop_candidate = None
+            if direction == "BUY":
+                target_stop = current_price - trail_distance
+                if target_stop > (current_stop + step_size):
+                    new_stop_candidate = round(target_stop, 1)
+            elif direction == "SELL":
+                target_stop = current_price + trail_distance
+                if target_stop < (current_stop - step_size):
+                    new_stop_candidate = round(target_stop, 1)
+
+            if new_stop_candidate:
+                 return {"type": "MODIFY_STOP", "new_stop": new_stop_candidate}
+
+        return None
 
     def handle_event(self, event: TradeEvent, payload: Dict[str, Any] = None) -> None:
         """
