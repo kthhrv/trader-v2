@@ -15,7 +15,7 @@ Connect the `TradeActor` to the database and existing execution adapters.
 - [x] Task: Implement state persistence and recovery for `TradeActor`. [8f3a489]
     - [ ] Write tests for saving/loading `TradeActor` state from DB.
     - [ ] Implement persistence logic in `app/database/queries.py` and `TradeActor`.
-- [ ] Task: Integrate `TradeActor` with `IGClient` (or `executor.py`).
+- [x] Task: Integrate `TradeActor` with `IGClient` (or `executor.py`). [70eaa46]
     - [ ] Write integration tests for order execution driven by `TradeActor`.
     - [ ] Implement adapter integration logic.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Integration with Execution & Persistence' (Protocol in workflow.md)
