@@ -130,14 +130,16 @@ class TradeActor:
         new_state = self._transitions[self.state][event]
         
         # Record transition
-        transition_record = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "event": event,
-            "from_state": self.state,
-            "to_state": new_state,
-            "payload": payload or {}
-        }
-        self.history.append(transition_record)
+        # Optimization: Do NOT record PRICE_UPDATED events in history to prevent DB bloat
+        if event != TradeEvent.PRICE_UPDATED:
+            transition_record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "event": event,
+                "from_state": self.state,
+                "to_state": new_state,
+                "payload": payload or {}
+            }
+            self.history.append(transition_record)
         
         # Update state
         self.state = new_state
