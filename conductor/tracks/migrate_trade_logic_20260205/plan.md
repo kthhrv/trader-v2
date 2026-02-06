@@ -4,7 +4,7 @@
 Equip the `TradeActor` with the parameters and logic needed to make decisions.
 
 - [x] Task: Update `TradeActor` to store configuration (entry, ATR, stop/trailing rules). [7820c13]
-- [ ] Task: Implement `TradeActor` logic to detect breakeven and trailing stop triggers.
+- [x] Task: Implement `TradeActor` logic to detect breakeven and trailing stop triggers. [375222e]
     - [ ] Write unit tests for BE trigger inside `TradeActor`.
     - [ ] Write unit tests for Trailing Stop calculation inside `TradeActor`.
     - [ ] Implement the logic within the `TradeActor` class.
