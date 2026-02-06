@@ -21,5 +21,5 @@ Simplify the `TradeExecutor` by delegating logic to the `TradeActor`.
 ## Phase 3: Final Verification
 Ensure the end-to-end flow is robust and better tested.
 
-- [ ] Task: Run full suite of E2E tests to ensure no regressions.
+- [x] Task: Run full suite of E2E tests to ensure no regressions. [b005217]
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Final Verification' (Protocol in workflow.md)
