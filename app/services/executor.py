@@ -12,6 +12,8 @@ from app.services.streamer import StreamerService
 from app.services.market_status import MarketStatusService
 from app.database import session as db_session
 from app.database.models import TradeExecution
+from app.domain.trade_actor import TradeActor, TradeEvent, TradeState
+from app.database.queries import save_trade_actor_state, load_trade_actor_state
 
 
 class TradeExecutor:
@@ -80,6 +82,11 @@ class TradeExecutor:
             logger.info(f"Order Placed: {response}")
 
             deal_id = response.get("dealId")
+            
+            # Initialize TradeActor
+            actor_id = deal_id or response.get("dealReference") or f"TEMP_{datetime.now(timezone.utc).timestamp()}"
+            actor = TradeActor(trade_id=actor_id)
+            
             if "dealReference" in response:
                 deal_ref = response["dealReference"]
 
@@ -94,12 +101,27 @@ class TradeExecutor:
                         if confirm.get("dealStatus") == "ACCEPTED":
                             deal_id = confirm.get("dealId")
                             logger.info(f"Order ACCEPTED. Deal ID: {deal_id}")
+                            
+                            # Update actor ID if it changed from ref to deal_id
+                            actor.trade_id = deal_id
+                            actor.handle_event(TradeEvent.ORDER_ACKNOWLEDGED, payload=confirm)
+                            async with db_session.async_session_maker() as session:
+                                await save_trade_actor_state(session, actor)
+                                await session.commit()
+                                
                             break
                         elif confirm.get("dealStatus") == "REJECTED":
                             logger.error(f"Order REJECTED: {confirm.get('reason')}")
                             return
                     except Exception:
                         pass
+            else:
+                # Immediate acceptance
+                if deal_id:
+                    actor.handle_event(TradeEvent.ORDER_ACKNOWLEDGED, payload=response)
+                    async with db_session.async_session_maker() as session:
+                        await save_trade_actor_state(session, actor)
+                        await session.commit()
 
             if not deal_id:
                 logger.error("Could not obtain Deal ID. Trade execution incomplete.")
