@@ -4,7 +4,7 @@
 Define the `TradeActor` structure and core state machine logic.
 
 - [x] Task: Define `TradeActor` states and events in `app/domain/models.py` or a new `app/domain/trade_actor.py`. [9556e68]
-- [ ] Task: Create `TradeActor` base class with state transition logic.
+- [x] Task: Create `TradeActor` base class with state transition logic. [907c034]
     - [ ] Write unit tests for basic state transitions (`PENDING` -> `OPEN`).
     - [ ] Implement `TradeActor` core logic to pass tests.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation & Core FSM' (Protocol in workflow.md)
