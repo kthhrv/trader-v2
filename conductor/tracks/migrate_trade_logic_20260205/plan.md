@@ -1,6 +1,6 @@
 # Implementation Plan: Migrate Active Trade Logic to TradeActor
 
-## Phase 1: Enhanced TradeActor
+## Phase 1: Enhanced TradeActor [checkpoint: 36ee454]
 Equip the `TradeActor` with the parameters and logic needed to make decisions.
 
 - [x] Task: Update `TradeActor` to store configuration (entry, ATR, stop/trailing rules). [7820c13]
