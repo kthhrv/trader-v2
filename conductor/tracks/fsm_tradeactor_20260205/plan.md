@@ -1,6 +1,6 @@
 # Implementation Plan: FSM TradeActor Refactor
 
-## Phase 1: Foundation & Core FSM
+## Phase 1: Foundation & Core FSM [checkpoint: bc26ac9]
 Define the `TradeActor` structure and core state machine logic.
 
 - [x] Task: Define `TradeActor` states and events in `app/domain/models.py` or a new `app/domain/trade_actor.py`. [9556e68]
