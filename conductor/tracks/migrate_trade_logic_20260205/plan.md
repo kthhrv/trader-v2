@@ -13,7 +13,7 @@ Equip the `TradeActor` with the parameters and logic needed to make decisions.
 ## Phase 2: Refactor Executor
 Simplify the `TradeExecutor` by delegating logic to the `TradeActor`.
 
-- [ ] Task: Modify `TradeExecutor._monitor_position` to pass price updates and act on `TradeActor` commands.
+- [x] Task: Modify `TradeExecutor._monitor_position` to pass price updates and act on `TradeActor` commands. [b005217]
     - [ ] Write tests showing `TradeExecutor` responding to an actor's "request to modify" signal.
     - [ ] Remove procedural BE/Trailing logic from `executor.py`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Refactor Executor' (Protocol in workflow.md)
