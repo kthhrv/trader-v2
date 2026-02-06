@@ -20,6 +20,6 @@ Update the Sentinel to respect the new configuration.
 ## Phase 3: Final Verification
 Ensure the system behaves correctly with different environment settings.
 
-- [ ] Task: Manual E2E test of Sentinel behavior.
+- [x] Task: Manual E2E test of Sentinel behavior.
     - [ ] Set `SENTINEL_MODE=MONITOR_ONLY` in `.env` and verify no strategy runs are triggered on technical spikes.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Final Verification' (Protocol in workflow.md)
