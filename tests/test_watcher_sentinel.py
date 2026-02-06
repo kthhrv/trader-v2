@@ -26,6 +26,10 @@ def sentinel(mock_notifier, monkeypatch):
         watcher_module.MarketStatusService, "is_market_open", lambda self, epic: True
     )
 
+    # Patch Config for Auto Trade
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "SENTINEL_MODE", "AUTO_TRADE")
+
     s = MetricSensor(mock_notifier)
     s.redis_client = AsyncMock()  # Mock Redis publish
     return s

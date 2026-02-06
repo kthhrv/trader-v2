@@ -100,16 +100,24 @@ class MetricSensor:
             (k for k, v in MARKET_CONFIGS.items() if v["epic"] == epic), None
         )
         if self.redis_client and market_key:
-            payload = {
-                "command": "RUN_STRATEGY",
-                "market": market_key,
-                "reason": f"sentinel_{reason}",
-            }
-            await self.redis_client.publish("trade_commands", json.dumps(payload))
+            # Check Mode
+            if settings.SENTINEL_MODE == "AUTO_TRADE":
+                payload = {
+                    "command": "RUN_STRATEGY",
+                    "market": market_key,
+                    "reason": f"sentinel_{reason}",
+                }
+                await self.redis_client.publish("trade_commands", json.dumps(payload))
+                logger.info(f"Sentinel triggered strategy for {market_key} (AUTO_TRADE)")
+            else:
+                logger.info(f"Sentinel Alert Only (MONITOR_ONLY): {reason}")
 
             # Send HA Notification
             market_name = MARKET_CONFIGS[market_key]["name"]
             title = f"SENTINEL: {market_name}"
+            if settings.SENTINEL_MODE != "AUTO_TRADE":
+                title = f"[MONITOR] {title}"
+                
             msg = f"Trigger: {reason} at {price}"
             await self.notifier.send_notification(title, msg, priority="high")
 
@@ -128,7 +136,7 @@ class WatcherService:
         """
         Main loop listening to Redis with automatic reconnection.
         """
-        logger.info("WatcherService starting...")
+        logger.info(f"WatcherService starting... (Mode: {settings.SENTINEL_MODE})")
 
         while True:
             try:

@@ -65,6 +65,10 @@ async def test_sentinel_to_strategy_e2e(monkeypatch):
         watcher_module.MarketStatusService, "is_market_open", lambda self, epic: True
     )
 
+    # Patch Config for Auto Trade
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "SENTINEL_MODE", "AUTO_TRADE")
+
     # 1. Setup Watcher (MetricSensor)
     mock_notifier = AsyncMock()
     sensor = MetricSensor(mock_notifier)

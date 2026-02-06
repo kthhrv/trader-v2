@@ -1,0 +1,8 @@
+{
+  "track_id": "sentinel_config_20260205",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-05T12:00:00Z",
+  "updated_at": "2026-02-05T12:00:00Z",
+  "description": "Make Sentinel publishing a RUN_STRATEGY configurable in .env"
+}

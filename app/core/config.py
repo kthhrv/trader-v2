@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
 
+    # --- Sentinel ---
+    SENTINEL_MODE: Literal["MONITOR_ONLY", "AUTO_TRADE"] = "MONITOR_ONLY"
+
     # --- Database (PostgreSQL/TimescaleDB) ---
     POSTGRES_USER: str = "trader"
     POSTGRES_PASSWORD: SecretStr = SecretStr("trader_pass")
