@@ -17,7 +17,7 @@ Update the Sentinel to respect the new configuration.
     - [ ] Update `MetricSensor._trigger_bot` implementation to check `settings.SENTINEL_MODE`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Logic Implementation' (Protocol in workflow.md)
 
-## Phase 3: Final Verification
+## Phase 3: Final Verification [checkpoint: 314a1c4]
 Ensure the system behaves correctly with different environment settings.
 
 - [x] Task: Manual E2E test of Sentinel behavior.
