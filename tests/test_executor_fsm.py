@@ -44,3 +44,56 @@ async def test_executor_updates_actor_state(mock_deps):
         actor = args[1]
         assert actor.state == TradeState.OPEN
         assert actor.trade_id == "DEAL1"
+
+@pytest.mark.asyncio
+async def test_monitor_position_updates_actor(mock_deps):
+    mock_client, mock_streamer, mock_status = mock_deps
+    
+    # 1. Setup Stream
+    async def mock_stream(epic):
+        # Trigger BE then trailing
+        yield {"type": "price_update", "bid": 120.0, "offer": 122.0}
+
+    mock_streamer.stream = mock_stream
+    mock_status.get_market_close_datetime.return_value = None
+    
+    executor = TradeExecutor(mock_client, mock_streamer, mock_status)
+    executor._is_position_open = AsyncMock(return_value=True)
+    executor._update_execution_stop = AsyncMock()
+    
+    # 2. Mock Actor Loading/Saving
+    from app.domain.trade_actor import TradeActor, TradeState
+    initial_actor = TradeActor(trade_id="DEAL123")
+    initial_actor.state = TradeState.OPEN
+    
+    with patch("app.services.executor.load_trade_actor_state", return_value=initial_actor) as mock_load, \
+         patch("app.services.executor.save_trade_actor_state", new_callable=AsyncMock) as mock_save, \
+         patch("app.services.executor.datetime") as mock_dt:
+        
+        import itertools
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).timestamp()
+        mock_dt.now.return_value.timestamp.side_effect = itertools.count(ts, 10.0)
+        mock_dt.now.return_value.tzinfo = timezone.utc
+        
+        await executor._monitor_position(
+            deal_id="DEAL123",
+            epic="TEST",
+            direction="BUY",
+            entry_price=100.0,
+            current_stop=90.0,
+            atr=5.0,
+            size=1.0,
+        )
+        
+        # 3. Verify actor was updated
+        # It should have: PRICE_UPDATED, STOP_LOSS_UPDATE_REQUESTED, STOP_LOSS_UPDATE_CONFIRMED
+        assert mock_save.call_count >= 1
+        # Check that at least one call saved an actor that went through MODIFYING
+        found_modifying = False
+        for call in mock_save.call_args_list:
+            saved_actor = call.args[1]
+            if any(h["event"] == TradeEvent.STOP_LOSS_UPDATE_REQUESTED for h in saved_actor.history):
+                found_modifying = True
+        
+        assert found_modifying, "Actor did not record STOP_LOSS_UPDATE_REQUESTED"

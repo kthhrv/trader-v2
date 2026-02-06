@@ -222,6 +222,17 @@ class TradeExecutor:
             f"Starting Monitor for Deal {deal_id} (Entry: {entry_price}, Stop: {current_stop}, ATR: {atr})..."
         )
 
+        # Load or initialize TradeActor
+        async with db_session.async_session_maker() as session:
+            actor = await load_trade_actor_state(session, deal_id)
+        
+        if not actor:
+            actor = TradeActor(trade_id=deal_id)
+            actor.state = TradeState.OPEN # Assume open if we are monitoring
+            async with db_session.async_session_maker() as session:
+                await save_trade_actor_state(session, actor)
+                await session.commit()
+
         # 0. Market Close Check Setup
         market_close_dt = None
         try:
@@ -279,6 +290,11 @@ class TradeExecutor:
                                 logger.info(
                                     f"STREAM: Deal {deal_id} CLOSED via trade update."
                                 )
+                                actor.handle_event(TradeEvent.CLOSE_FILLED, payload=data)
+                                async with db_session.async_session_maker() as session:
+                                    await save_trade_actor_state(session, actor)
+                                    await session.commit()
+
                                 await self._sync_outcome(deal_id)
                                 break
                     except json.JSONDecodeError:
@@ -290,6 +306,10 @@ class TradeExecutor:
                 last_check_time = now
                 if not await self._is_position_open(deal_id):
                     logger.info(f"Position {deal_id} closed. Stopping monitor.")
+                    actor.handle_event(TradeEvent.CLOSE_FILLED, payload={"source": "liveness_check"})
+                    async with db_session.async_session_maker() as session:
+                        await save_trade_actor_state(session, actor)
+                        await session.commit()
                     await self._sync_outcome(deal_id)
                     break
 
@@ -303,6 +323,10 @@ class TradeExecutor:
                         logger.warning(
                             f"Market for {epic} closing in {time_to_close}. Forcing exit for {deal_id}."
                         )
+                        actor.handle_event(TradeEvent.MANUAL_CLOSE_REQUESTED, payload={"reason": "market_close"})
+                        async with db_session.async_session_maker() as session:
+                            await save_trade_actor_state(session, actor)
+                            await session.commit()
                         try:
                             # Close Direction is opposite of opening
                             close_dir = "SELL" if direction == "BUY" else "BUY"
@@ -315,6 +339,10 @@ class TradeExecutor:
                             logger.info(
                                 f"Successfully force-closed {deal_id} before market close."
                             )
+                            actor.handle_event(TradeEvent.CLOSE_FILLED, payload={"source": "market_close"})
+                            async with db_session.async_session_maker() as session:
+                                await save_trade_actor_state(session, actor)
+                                await session.commit()
                             await self._sync_outcome(deal_id)
                             break
                         except Exception as e:
@@ -327,6 +355,9 @@ class TradeExecutor:
                 offer = update.get("offer")
                 if not bid or not offer:
                     continue
+                
+                # Update actor
+                actor.handle_event(TradeEvent.PRICE_UPDATED, payload={"bid": bid, "offer": offer})
 
                 # Throttle Trailing Stop Logic (Every 5s)
                 if (now - last_trailing_check) < 5.0:
@@ -355,7 +386,7 @@ class TradeExecutor:
                             logger.info(
                                 f"Moving Stop to BREAKEVEN for {deal_id} at {new_stop} (Trigger: {breakeven_trigger_r}R)"
                             )
-                            if await self._update_stop_loss(deal_id, new_stop):
+                            if await self._update_stop_loss(deal_id, new_stop, actor=actor):
                                 current_stop = new_stop
                                 moved_to_breakeven = True
 
@@ -373,10 +404,16 @@ class TradeExecutor:
 
                     if new_stop_candidate:
                         logger.info(f"Trailing Stop Update: {new_stop_candidate}")
-                        if await self._update_stop_loss(deal_id, new_stop_candidate):
+                        if await self._update_stop_loss(deal_id, new_stop_candidate, actor=actor):
                             current_stop = new_stop_candidate
 
-    async def _update_stop_loss(self, deal_id: str, new_stop: float) -> bool:
+    async def _update_stop_loss(self, deal_id: str, new_stop: float, actor: Optional[TradeActor] = None) -> bool:
+        if actor:
+            actor.handle_event(TradeEvent.STOP_LOSS_UPDATE_REQUESTED, payload={"new_stop": new_stop})
+            async with db_session.async_session_maker() as session:
+                await save_trade_actor_state(session, actor)
+                await session.commit()
+
         try:
             await self.ig_client.update_open_position(
                 deal_id,
@@ -384,6 +421,12 @@ class TradeExecutor:
                 env_type=settings.TRADING_ACCOUNT_ENV,
             )
             await self._update_execution_stop(deal_id, new_stop)
+            
+            if actor:
+                actor.handle_event(TradeEvent.STOP_LOSS_UPDATE_CONFIRMED, payload={"confirmed_stop": new_stop})
+                async with db_session.async_session_maker() as session:
+                    await save_trade_actor_state(session, actor)
+                    await session.commit()
             return True
         except Exception as e:
             logger.error(f"Failed to update stop for {deal_id}: {e}")
