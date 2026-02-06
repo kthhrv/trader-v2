@@ -7,7 +7,38 @@ from app.database.models import (
     TradeExecution,
     HistoricalCandle,
     TradePostMortem,
+    TradeActorState,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.domain.trade_actor import TradeActor
+
+
+async def save_trade_actor_state(session: AsyncSession, actor: TradeActor):
+    """
+    Persists the current state and history of a TradeActor.
+    """
+    db_state = await session.get(TradeActorState, actor.trade_id)
+    if not db_state:
+        db_state = TradeActorState(trade_id=actor.trade_id, state=actor.state)
+        session.add(db_state)
+
+    db_state.state = actor.state
+    db_state.history = actor.history
+    db_state.updated_at = datetime.now()
+
+
+async def load_trade_actor_state(session: AsyncSession, trade_id: str) -> Optional[TradeActor]:
+    """
+    Loads a TradeActor from its persisted state.
+    """
+    db_state = await session.get(TradeActorState, trade_id)
+    if not db_state:
+        return None
+
+    actor = TradeActor(trade_id=trade_id)
+    actor.state = db_state.state
+    actor.history = db_state.history
+    return actor
 
 
 async def get_trade_candles(

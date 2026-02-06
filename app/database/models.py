@@ -1,7 +1,23 @@
 from datetime import datetime, timezone
-from typing import Optional
-from sqlmodel import Field, SQLModel, Relationship
+from typing import Optional, List, Dict, Any
+from sqlmodel import Field, SQLModel, Relationship, JSON
 from sqlalchemy import Column, DateTime
+
+
+class TradeActorState(SQLModel, table=True):
+    """
+    Persistence for FSM TradeActor state.
+    """
+
+    __tablename__ = "trade_actor_states"
+
+    trade_id: str = Field(primary_key=True, index=True)
+    state: str
+    history: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
 class TradeSignal(SQLModel, table=True):
