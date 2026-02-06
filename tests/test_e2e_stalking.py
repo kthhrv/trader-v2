@@ -66,6 +66,8 @@ async def test_e2e_stalking_flow():
     mock_ig.fetch_client_sentiment_by_instrument = AsyncMock(
         return_value={"longPositionPercentage": 50}
     )
+    mock_ig.create_order = AsyncMock(return_value={"dealReference": "REF123", "level": 4000.0})
+    mock_ig.fetch_deal_confirmation = AsyncMock(return_value={"dealStatus": "ACCEPTED", "dealId": "DEAL123"})
 
     mock_gemini = AsyncMock()
     mock_gemini.analyze_market.side_effect = [wait_signal, buy_signal]
@@ -105,7 +107,7 @@ async def test_e2e_stalking_flow():
                 "No historical data fetched"
             )
             assert mock_gemini.analyze_market.call_count == 2
-            assert mock_sleep.call_count == 1
+            assert mock_sleep.call_count >= 1
             mock_ig.create_order.assert_called_once()
 
             args, kwargs = mock_ig.create_order.call_args

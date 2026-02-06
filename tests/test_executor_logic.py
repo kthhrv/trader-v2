@@ -60,12 +60,13 @@ async def test_executor_breakeven_trigger(mock_deps):
     # Verify Update called at least once
     assert mock_client.update_open_position.call_count >= 1
 
-    # Verify the sequence includes BE (100.0)
+    # Verify the sequence includes BE (100.0) or better
     # Note: If it happened in the same tick, we might see 100.0 then 101.0
+    # or just 101.0 if the actor combined them.
     calls = mock_client.update_open_position.call_args_list
-    # Check if ANY call set stop to 100.0
-    has_be = any(call.kwargs.get("stop_level") == 100.0 for call in calls)
-    assert has_be, "Breakeven update (100.0) not found in calls"
+    # Check if ANY call set stop to >= 100.0 (for BUY, higher is better)
+    has_be_or_better = any(call.kwargs.get("stop_level") >= 100.0 for call in calls)
+    assert has_be_or_better, f"Breakeven or better update not found in calls: {calls}"
 
 
 @pytest.mark.asyncio

@@ -78,35 +78,45 @@ class TradeActor:
         step_size = cfg.get("step_size", 0.1)
 
         # Logic State
-        # We determine "moved_to_breakeven" by checking if current_stop is better than or equal to entry
         moved_to_breakeven = False
         if direction == "BUY":
             moved_to_breakeven = current_stop >= entry_price
         else:
             moved_to_breakeven = current_stop <= entry_price
 
+        target_stop = None
+
         # Rule 1: Check for Breakeven Trigger
+        is_be_triggered = False
         if not moved_to_breakeven and risk_distance > 0:
             profit_dist = (current_price - entry_price) if direction == "BUY" else (entry_price - current_price)
-            
             if profit_dist >= (breakeven_r * risk_distance):
-                new_stop = entry_price
-                return {"type": "MODIFY_STOP", "new_stop": new_stop}
+                target_stop = entry_price
+                is_be_triggered = True
 
-        # Rule 2: Dynamic Trailing (Only AFTER Breakeven)
-        if moved_to_breakeven and trail_distance:
-            new_stop_candidate = None
+        # Rule 2: Dynamic Trailing (If already at BE OR triggered now)
+        if (moved_to_breakeven or is_be_triggered) and trail_distance:
+            trail_target = None
             if direction == "BUY":
-                target_stop = current_price - trail_distance
-                if target_stop > (current_stop + step_size):
-                    new_stop_candidate = round(target_stop, 1)
+                trail_target = round(current_price - trail_distance, 1)
             elif direction == "SELL":
-                target_stop = current_price + trail_distance
-                if target_stop < (current_stop - step_size):
-                    new_stop_candidate = round(target_stop, 1)
+                trail_target = round(current_price + trail_distance, 1)
 
-            if new_stop_candidate:
-                 return {"type": "MODIFY_STOP", "new_stop": new_stop_candidate}
+            if trail_target:
+                # Comparison basis is either the new BE stop or the existing stop
+                basis_stop = target_stop if target_stop is not None else current_stop
+                
+                is_improvement = False
+                if direction == "BUY":
+                    is_improvement = trail_target > (basis_stop + step_size)
+                else:
+                    is_improvement = trail_target < (basis_stop - step_size)
+                
+                if is_improvement:
+                    target_stop = trail_target
+
+        if target_stop is not None:
+             return {"type": "MODIFY_STOP", "new_stop": target_stop}
 
         return None
 

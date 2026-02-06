@@ -33,6 +33,7 @@ async def test_executor_updates_actor_state(mock_deps):
     signal.stop_loss = 90.0
     signal.take_profit = 110.0
     signal.use_trailing_stop = False
+    signal.atr = 5.0
     
     with patch("app.services.executor.save_trade_actor_state", new_callable=AsyncMock) as mock_save:
         await executor.execute_trade(signal, "EPIC1", 123)
@@ -44,6 +45,7 @@ async def test_executor_updates_actor_state(mock_deps):
         actor = args[1]
         assert actor.state == TradeState.OPEN
         assert actor.trade_id == "DEAL1"
+        assert actor.config["direction"] == "BUY"
 
 @pytest.mark.asyncio
 async def test_monitor_position_updates_actor(mock_deps):
@@ -63,7 +65,15 @@ async def test_monitor_position_updates_actor(mock_deps):
     
     # 2. Mock Actor Loading/Saving
     from app.domain.trade_actor import TradeActor, TradeState
-    initial_actor = TradeActor(trade_id="DEAL123")
+    config = {
+        "direction": "BUY",
+        "entry_price": 100.0,
+        "initial_stop": 90.0,
+        "current_stop": 90.0,
+        "breakeven_r": 1.5,
+        "trail_distance": 15.0
+    }
+    initial_actor = TradeActor(trade_id="DEAL123", config=config)
     initial_actor.state = TradeState.OPEN
     
     with patch("app.services.executor.load_trade_actor_state", return_value=initial_actor) as mock_load, \
@@ -72,9 +82,10 @@ async def test_monitor_position_updates_actor(mock_deps):
         
         import itertools
         from datetime import datetime, timezone
-        ts = datetime.now(timezone.utc).timestamp()
-        mock_dt.now.return_value.timestamp.side_effect = itertools.count(ts, 10.0)
-        mock_dt.now.return_value.tzinfo = timezone.utc
+        fixed_now = MagicMock()
+        fixed_now.timestamp.side_effect = itertools.count(2000000000.0, 10.0)
+        fixed_now.tzinfo = timezone.utc
+        mock_dt.now.return_value = fixed_now
         
         await executor._monitor_position(
             deal_id="DEAL123",
@@ -87,9 +98,8 @@ async def test_monitor_position_updates_actor(mock_deps):
         )
         
         # 3. Verify actor was updated
-        # It should have: PRICE_UPDATED, STOP_LOSS_UPDATE_REQUESTED, STOP_LOSS_UPDATE_CONFIRMED
         assert mock_save.call_count >= 1
-        # Check that at least one call saved an actor that went through MODIFYING
+        # Check for requested modification
         found_modifying = False
         for call in mock_save.call_args_list:
             saved_actor = call.args[1]

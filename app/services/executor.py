@@ -83,9 +83,20 @@ class TradeExecutor:
 
             deal_id = response.get("dealId")
             
-            # Initialize TradeActor
+            # Initialize TradeActor with configuration
+            actor_config = {
+                "direction": direction,
+                "entry_price": float(response.get("level", triggered_price)),
+                "initial_stop": signal.stop_loss,
+                "current_stop": signal.stop_loss,
+                "atr": signal.atr,
+                "breakeven_r": settings.BREAKEVEN_TRIGGER_R,
+                "trail_distance": signal.atr * 3.0 if signal.use_trailing_stop else None,
+                "step_size": signal.atr * 0.1,
+            }
+            
             actor_id = deal_id or response.get("dealReference") or f"TEMP_{datetime.now(timezone.utc).timestamp()}"
-            actor = TradeActor(trade_id=actor_id)
+            actor = TradeActor(trade_id=actor_id, config=actor_config)
             
             if "dealReference" in response:
                 deal_ref = response["dealReference"]
@@ -227,7 +238,17 @@ class TradeExecutor:
             actor = await load_trade_actor_state(session, deal_id)
         
         if not actor:
-            actor = TradeActor(trade_id=deal_id)
+            actor_config = {
+                "direction": direction,
+                "entry_price": entry_price,
+                "initial_stop": current_stop, # Best guess if missing
+                "current_stop": current_stop,
+                "atr": atr,
+                "breakeven_r": settings.BREAKEVEN_TRIGGER_R,
+                "trail_distance": atr * 3.0, # Best guess
+                "step_size": atr * 0.1,
+            }
+            actor = TradeActor(trade_id=deal_id, config=actor_config)
             actor.state = TradeState.OPEN # Assume open if we are monitoring
             async with db_session.async_session_maker() as session:
                 await save_trade_actor_state(session, actor)
@@ -240,17 +261,6 @@ class TradeExecutor:
             logger.info(f"Market Close time for {epic}: {market_close_dt}")
         except Exception as e:
             logger.warning(f"Could not determine market close time for {epic}: {e}")
-
-        # Logic State
-        moved_to_breakeven = False
-        risk_distance = abs(entry_price - current_stop)
-
-        # Configuration
-        breakeven_trigger_r = settings.BREAKEVEN_TRIGGER_R
-
-        # Trailing Parameters (Loose trail after BE)
-        trail_distance = atr * 3.0
-        step_size = atr * 0.1  # Min step to avoid spamming
 
         timeout = 28800  # 8 hours for monitoring
         start_time = datetime.now(timezone.utc).timestamp()
@@ -359,53 +369,24 @@ class TradeExecutor:
                 # Update actor
                 actor.handle_event(TradeEvent.PRICE_UPDATED, payload={"bid": bid, "offer": offer})
 
-                # Throttle Trailing Stop Logic (Every 5s)
+                # Throttle Logic (Every 5s)
                 if (now - last_trailing_check) < 5.0:
                     continue
                 last_trailing_check = now
 
+                # Decide on actions using TradeActor logic
                 current_price = bid if direction == "BUY" else offer
-
-                # Rule 1: Check for Breakeven Trigger
-                if not moved_to_breakeven and risk_distance > 0:
-                    profit_dist = (
-                        (current_price - entry_price)
-                        if direction == "BUY"
-                        else (entry_price - current_price)
-                    )
-
-                    if profit_dist >= (breakeven_trigger_r * risk_distance):
-                        new_stop = entry_price
-
-                        # Verify it's actually an improvement
-                        is_better = (
-                            direction == "BUY" and new_stop > current_stop
-                        ) or (direction == "SELL" and new_stop < current_stop)
-
-                        if is_better:
-                            logger.info(
-                                f"Moving Stop to BREAKEVEN for {deal_id} at {new_stop} (Trigger: {breakeven_trigger_r}R)"
-                            )
-                            if await self._update_stop_loss(deal_id, new_stop, actor=actor):
-                                current_stop = new_stop
-                                moved_to_breakeven = True
-
-                # Rule 2: Dynamic Trailing (Only AFTER Breakeven)
-                if moved_to_breakeven:
-                    new_stop_candidate = None
-                    if direction == "BUY":
-                        target_stop = current_price - trail_distance
-                        if target_stop > (current_stop + step_size):
-                            new_stop_candidate = round(target_stop, 1)
-                    elif direction == "SELL":
-                        target_stop = current_price + trail_distance
-                        if target_stop < (current_stop - step_size):
-                            new_stop_candidate = round(target_stop, 1)
-
-                    if new_stop_candidate:
-                        logger.info(f"Trailing Stop Update: {new_stop_candidate}")
-                        if await self._update_stop_loss(deal_id, new_stop_candidate, actor=actor):
-                            current_stop = new_stop_candidate
+                action = actor.on_price_update(current_price)
+                
+                if action and action.get("type") == "MODIFY_STOP":
+                    new_stop = action["new_stop"]
+                    logger.info(f"Actor requested stop update to {new_stop}")
+                    if await self._update_stop_loss(deal_id, new_stop, actor=actor):
+                        # Sync actor config
+                        actor.config["current_stop"] = new_stop
+                        async with db_session.async_session_maker() as session:
+                            await save_trade_actor_state(session, actor)
+                            await session.commit()
 
     async def _update_stop_loss(self, deal_id: str, new_stop: float, actor: Optional[TradeActor] = None) -> bool:
         if actor:
