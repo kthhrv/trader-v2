@@ -3,7 +3,7 @@
 ## Phase 1: Enhanced TradeActor
 Equip the `TradeActor` with the parameters and logic needed to make decisions.
 
-- [ ] Task: Update `TradeActor` to store configuration (entry, ATR, stop/trailing rules).
+- [x] Task: Update `TradeActor` to store configuration (entry, ATR, stop/trailing rules). [7820c13]
 - [ ] Task: Implement `TradeActor` logic to detect breakeven and trailing stop triggers.
     - [ ] Write unit tests for BE trigger inside `TradeActor`.
     - [ ] Write unit tests for Trailing Stop calculation inside `TradeActor`.
