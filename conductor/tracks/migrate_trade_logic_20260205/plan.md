@@ -18,7 +18,7 @@ Simplify the `TradeExecutor` by delegating logic to the `TradeActor`.
     - [x] Remove procedural BE/Trailing logic from `executor.py`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Refactor Executor' (Protocol in workflow.md)
 
-## Phase 3: Final Verification
+## Phase 3: Final Verification [checkpoint: 64566f5]
 Ensure the end-to-end flow is robust and better tested.
 
 - [x] Task: Run full suite of E2E tests to ensure no regressions. [b005217]
