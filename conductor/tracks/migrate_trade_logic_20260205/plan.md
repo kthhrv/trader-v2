@@ -5,17 +5,17 @@ Equip the `TradeActor` with the parameters and logic needed to make decisions.
 
 - [x] Task: Update `TradeActor` to store configuration (entry, ATR, stop/trailing rules). [7820c13]
 - [x] Task: Implement `TradeActor` logic to detect breakeven and trailing stop triggers. [375222e]
-    - [ ] Write unit tests for BE trigger inside `TradeActor`.
-    - [ ] Write unit tests for Trailing Stop calculation inside `TradeActor`.
-    - [ ] Implement the logic within the `TradeActor` class.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Enhanced TradeActor' (Protocol in workflow.md)
+    - [x] Write unit tests for BE trigger inside `TradeActor`.
+    - [x] Write unit tests for Trailing Stop calculation inside `TradeActor`.
+    - [x] Implement the logic within the `TradeActor` class.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Enhanced TradeActor' (Protocol in workflow.md)
 
-## Phase 2: Refactor Executor
+## Phase 2: Refactor Executor [checkpoint: fe1bc6a]
 Simplify the `TradeExecutor` by delegating logic to the `TradeActor`.
 
 - [x] Task: Modify `TradeExecutor._monitor_position` to pass price updates and act on `TradeActor` commands. [b005217]
-    - [ ] Write tests showing `TradeExecutor` responding to an actor's "request to modify" signal.
-    - [ ] Remove procedural BE/Trailing logic from `executor.py`.
+    - [x] Write tests showing `TradeExecutor` responding to an actor's "request to modify" signal.
+    - [x] Remove procedural BE/Trailing logic from `executor.py`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Refactor Executor' (Protocol in workflow.md)
 
 ## Phase 3: Final Verification
