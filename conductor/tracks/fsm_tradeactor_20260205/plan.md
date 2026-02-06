@@ -12,7 +12,7 @@ Define the `TradeActor` structure and core state machine logic.
 ## Phase 2: Integration with Execution & Persistence
 Connect the `TradeActor` to the database and existing execution adapters.
 
-- [ ] Task: Implement state persistence and recovery for `TradeActor`.
+- [x] Task: Implement state persistence and recovery for `TradeActor`. [8f3a489]
     - [ ] Write tests for saving/loading `TradeActor` state from DB.
     - [ ] Implement persistence logic in `app/database/queries.py` and `TradeActor`.
 - [ ] Task: Integrate `TradeActor` with `IGClient` (or `executor.py`).
