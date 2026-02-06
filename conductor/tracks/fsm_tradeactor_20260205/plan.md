@@ -26,7 +26,7 @@ Implement dynamic updates like trailing stops and manual overrides.
 - [x] Task: Implement dynamic stop-loss updates in `TradeActor`. [4923ac3]
     - [ ] Write tests for `OPEN` -> `MODIFYING` -> `OPEN` transition for SL updates.
     - [ ] Implement logic to handle price updates and trigger SL modifications.
-- [ ] Task: Refactor `trader.py` or `executor.py` to use `TradeActor` for all trades.
+- [x] Task: Refactor `trader.py` or `executor.py` to use `TradeActor` for all trades. [8fd4e23]
     - [ ] Write E2E tests for the new flow.
     - [ ] Perform the final refactoring.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Active Trade Management' (Protocol in workflow.md)
