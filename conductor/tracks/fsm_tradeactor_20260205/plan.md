@@ -20,7 +20,7 @@ Connect the `TradeActor` to the database and existing execution adapters.
     - [ ] Implement adapter integration logic.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Integration with Execution & Persistence' (Protocol in workflow.md)
 
-## Phase 3: Active Trade Management
+## Phase 3: Active Trade Management [checkpoint: 3c67260]
 Implement dynamic updates like trailing stops and manual overrides.
 
 - [x] Task: Implement dynamic stop-loss updates in `TradeActor`. [4923ac3]
