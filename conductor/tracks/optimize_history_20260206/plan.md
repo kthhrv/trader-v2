@@ -1,6 +1,6 @@
 # Implementation Plan: Optimize TradeActor History
 
-## Phase 1: Filter Events
+## Phase 1: Filter Events [checkpoint: 25cddbc]
 Modify the `TradeActor` to filter out high-frequency events from history.
 
 - [~] Task: Update `TradeActor.handle_event` to skip appending `PRICE_UPDATED` to history.
