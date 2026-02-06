@@ -32,6 +32,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "aiosqlite>=0.22.1",
+    "envars",
     "invoke>=2.2.1",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
@@ -46,3 +47,6 @@ pythonpath = "."
 testpaths = ["tests"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv.sources]
+envars = { git = "https://github.com/timeoutdigital/envars2", rev = "openbao" }

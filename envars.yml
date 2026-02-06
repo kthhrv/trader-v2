@@ -1,0 +1,73 @@
+configuration:
+  app: trader2
+  kms_key: openbao:http://192.168.0.191:8200:trader
+  description_mandatory: false
+  environments:
+  - demo
+  - live
+  - local
+  - test
+
+environment_variables:
+  COMPOSE_PROJECT_NAME:
+    demo: demo
+    live: live
+
+  GEMINI_API_KEY:
+    demo: !secret |-
+      vault:v1:bukjW7asRk/g7LM6YwVeX+Ji0YIh8tnzl/0261MHf1kkL48AZjRPiQYV2rimbuoeNvSdf7eXtb4n/EAf6hF7PNMV9g==
+    live: !secret |-
+      vault:v1:J0SbWVHfsuIiTdMojtvl2py9hMZeZilQG+ejih3FZQ0ox5DH0JBnTWBD9HtfU8/Q5ZcDqxkZSyya/BZ2s7DJ1LBS9A==
+    local: !secret |-
+      vault:v1:j5FNvnBecIpc+WcXzGCy7Np8fNlSwDCSLF3ZqX5D10jO5MMOcS+nns3L+xciJh3ERVy7jlvQk1tUEkl0ZAApbr3adA==
+    test: !secret |-
+      vault:v1:TkWrCsEWZAIc+ig4XB18y+Ub3F2fq9fI9fE608bRzGd0VUaddA==
+
+  HA_ACCESS_TOKEN:
+    demo: !secret |-
+      vault:v1:nqUp6mtQIWcgEQrEHhVUwADhCT2M+EGqBdeIDLqmvLl2NRanqP7Ev/IXKMzfpNQL+WYZMPjo6N0yE0z0bcZI3WlSs+rxjV04EgeGnMNbfR3Prl7sO0NG+ODDxIwS6F16Hx1RPiZs14Iefe4xuOs/gdrtSHOlhpnOvoDR7v+n6jWbhyjyG12a3tDBw8kxiLQzmvOLH7BvA6uMUrNOMbSjTG5ms21PAcdZVlayz8yPqZ7tlZUz0zG/4vxIUrP7YIO+JgXHoLwaFxyrWNKfuvdygxo2JQ==
+    live: !secret |-
+      vault:v1:JuvaERA3BgHaR/JZyI3MYL2vlBJmgr9+BqicaFqh05qs0E88O8+0iiiCEpF/v/9UVfQA4bjE1i1CoRKkJvrI2PLVFafHGDAgeYsEN7cmKUR9B419zRs8thrR/LAYAeyMjLP/pk8PFJ0k/toeFIoTaE1Neg0QmyLaUaReSMX9YCBBaskjbyuOzB0W3rM7WQ6fCwvwqJMcArIesPL+BTYGb4vtP7O1ieWjpNx8YyFx3K6786aEdwj2Rq6paJStATYx30f1DHqSkXuyi+awoiP8ziAOPQ==
+    local: !secret |-
+      vault:v1:u9NYgbMfU5Gp8XmvQugJFeQ9MbzhRMvmLaxW8h8NMdzeecv5n32CPJBIsgZtLNT48lAfkRnSRGQAVIWqpjatMb83Jw7lcaYuvyCVX1rHIuwRq08lTJ4IoyHf4J2NLF8FZmH93G2v2iphsIVd2nRVd5Enlg2JGVyEGXo0S9wQT8XCHo+54DiG0nC31zBGtZSCNGTD2bs4UXmDrZf+fC6rf/JQaRTiQuDnzpc8jVISeaxU5KHHZqwwavTNrnaljAEcarJK7zNl6NWnL6YFrg49YjLnzQ==
+
+  HA_API_URL:
+    default: http://192.168.0.207:8123
+
+  HA_NOTIFY_ENTITY:
+    default: notify.mobile_app_pixel_8
+
+  POSTGRES_DB:
+    demo: trader_demo
+    live: trader_live
+
+  POSTGRES_HOST:
+    default: 192.168.0.191
+
+  POSTGRES_PASSWORD:
+    demo: !secret |-
+      vault:v1:xU/IqtnChv528ZCtOloXkQ8O1+ilnQ6oudvLmmMoMnNOIeO8
+
+  POSTGRES_PORT:
+    default: '5432'
+
+  POSTGRES_USER:
+    default: trader
+
+  REDIS_HOST:
+    demo: redis
+    live: redis
+    local: localhost
+
+  TRADING_ACCOUNT_ENV:
+    demo: DEMO
+    live: LIVE
+    local: DEMO
+
+  UI_API_PORT:
+    demo: '8010'
+    live: '8020'
+
+  UI_PORT:
+    demo: '3010'
+    live: '3020'
