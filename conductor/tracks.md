@@ -16,3 +16,13 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Optimize TradeActor history logging**
   *Link: [./conductor/tracks/optimize_history_20260206/](./conductor/tracks/optimize_history_20260206/)*
+
+---
+
+- [ ] **Track: Add Multi-Timeframe Alignment to MarketState**
+  *Link: [./conductor/tracks/mtf_alignment_20260205/](./conductor/tracks/mtf_alignment_20260205/)*
+
+---
+
+- [x] **Track: Make Sentinel publishing a RUN_STRATEGY configurable in .env**
+  *Link: [./conductor/tracks/sentinel_config_20260205/](./conductor/tracks/sentinel_config_20260205/)*
