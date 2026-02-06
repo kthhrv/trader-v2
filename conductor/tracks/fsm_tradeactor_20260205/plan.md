@@ -9,7 +9,7 @@ Define the `TradeActor` structure and core state machine logic.
     - [ ] Implement `TradeActor` core logic to pass tests.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation & Core FSM' (Protocol in workflow.md)
 
-## Phase 2: Integration with Execution & Persistence
+## Phase 2: Integration with Execution & Persistence [checkpoint: 0f7be2a]
 Connect the `TradeActor` to the database and existing execution adapters.
 
 - [x] Task: Implement state persistence and recovery for `TradeActor`. [8f3a489]
