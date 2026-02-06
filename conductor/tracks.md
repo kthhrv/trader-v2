@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Refactor core execution logic into an FSM-based TradeActor**
+- [x] **Track: Refactor core execution logic into an FSM-based TradeActor**
   *Link: [./conductor/tracks/fsm_tradeactor_20260205/](./conductor/tracks/fsm_tradeactor_20260205/)*
