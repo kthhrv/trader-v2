@@ -3,7 +3,7 @@
 ## Phase 1: Foundation & Core FSM
 Define the `TradeActor` structure and core state machine logic.
 
-- [ ] Task: Define `TradeActor` states and events in `app/domain/models.py` or a new `app/domain/trade_actor.py`.
+- [x] Task: Define `TradeActor` states and events in `app/domain/models.py` or a new `app/domain/trade_actor.py`. [9556e68]
 - [ ] Task: Create `TradeActor` base class with state transition logic.
     - [ ] Write unit tests for basic state transitions (`PENDING` -> `OPEN`).
     - [ ] Implement `TradeActor` core logic to pass tests.
