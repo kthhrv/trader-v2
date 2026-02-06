@@ -23,7 +23,7 @@ Connect the `TradeActor` to the database and existing execution adapters.
 ## Phase 3: Active Trade Management
 Implement dynamic updates like trailing stops and manual overrides.
 
-- [ ] Task: Implement dynamic stop-loss updates in `TradeActor`.
+- [x] Task: Implement dynamic stop-loss updates in `TradeActor`. [4923ac3]
     - [ ] Write tests for `OPEN` -> `MODIFYING` -> `OPEN` transition for SL updates.
     - [ ] Implement logic to handle price updates and trigger SL modifications.
 - [ ] Task: Refactor `trader.py` or `executor.py` to use `TradeActor` for all trades.
