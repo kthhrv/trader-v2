@@ -13,6 +13,7 @@ class TradeActorState(SQLModel, table=True):
 
     trade_id: str = Field(primary_key=True, index=True)
     state: str
+    config: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     history: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

@@ -21,8 +21,9 @@ class TradeEvent(str, Enum):
     CLOSE_FILLED = "CLOSE_FILLED"
 
 class TradeActor:
-    def __init__(self, trade_id: str):
+    def __init__(self, trade_id: str, config: Dict[str, Any] = None):
         self.trade_id = trade_id
+        self.config = config or {}
         self.state = TradeState.PENDING
         self.history: List[Dict[str, Any]] = []
         

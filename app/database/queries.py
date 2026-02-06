@@ -24,6 +24,7 @@ async def save_trade_actor_state(session: AsyncSession, actor: TradeActor):
 
     db_state.state = actor.state
     db_state.history = actor.history
+    db_state.config = actor.config
     db_state.updated_at = datetime.now()
 
 
@@ -35,7 +36,7 @@ async def load_trade_actor_state(session: AsyncSession, trade_id: str) -> Option
     if not db_state:
         return None
 
-    actor = TradeActor(trade_id=trade_id)
+    actor = TradeActor(trade_id=trade_id, config=db_state.config)
     actor.state = db_state.state
     actor.history = db_state.history
     return actor

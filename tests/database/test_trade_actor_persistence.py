@@ -11,7 +11,8 @@ async def test_save_and_load_trade_actor_state(test_db):
     and then reconstructed accurately.
     """
     # 1. Create and transition an actor
-    actor = TradeActor(trade_id="trade_123")
+    config = {"env": "prod"}
+    actor = TradeActor(trade_id="trade_123", config=config)
     actor.handle_event(TradeEvent.ORDER_ACKNOWLEDGED, payload={"broker": "IG"})
     
     # 2. Save to database
@@ -30,6 +31,7 @@ async def test_save_and_load_trade_actor_state(test_db):
     assert loaded_actor is not None
     assert loaded_actor.trade_id == actor.trade_id
     assert loaded_actor.state == actor.state
+    assert loaded_actor.config == config
     assert len(loaded_actor.history) == len(actor.history)
     assert loaded_actor.history[0]["event"] == TradeEvent.ORDER_ACKNOWLEDGED
     assert loaded_actor.history[0]["payload"]["broker"] == "IG"
