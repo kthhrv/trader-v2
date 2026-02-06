@@ -8,10 +8,10 @@ Add the new configuration parameter to the system.
 - [x] Task: Update `.env.example` to include the new variable.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Configuration & Settings' (Protocol in workflow.md)
 
-## Phase 2: Logic Implementation
+## Phase 2: Logic Implementation [checkpoint: 290fcf4]
 Update the Sentinel to respect the new configuration.
 
-- [ ] Task: Implement mode-aware triggering in `app/services/watcher.py`.
+- [x] Task: Implement mode-aware triggering in `app/services/watcher.py`.
     - [ ] Write unit tests for `MetricSensor._trigger_bot` to verify it skips Redis publishing when in `MONITOR_ONLY` mode.
     - [ ] Write unit tests for `MetricSensor._trigger_bot` to verify it publishes to Redis when in `AUTO_TRADE` mode.
     - [ ] Update `MetricSensor._trigger_bot` implementation to check `settings.SENTINEL_MODE`.
