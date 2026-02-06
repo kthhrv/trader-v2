@@ -11,3 +11,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Migrate active trade logic from Executor to TradeActor**
   *Link: [./conductor/tracks/migrate_trade_logic_20260205/](./conductor/tracks/migrate_trade_logic_20260205/)*
+
+---
+
+- [ ] **Track: Optimize TradeActor history logging**
+  *Link: [./conductor/tracks/optimize_history_20260206/](./conductor/tracks/optimize_history_20260206/)*
