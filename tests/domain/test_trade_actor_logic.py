@@ -26,3 +26,17 @@ def test_invalid_transition():
     # PENDING -> CLOSE_FILLED is invalid
     with pytest.raises(ValueError):
         actor.handle_event(TradeEvent.CLOSE_FILLED)
+
+def test_transition_stop_loss_update():
+    """Verify transition from OPEN to MODIFYING and back to OPEN on SL update."""
+    actor = TradeActor(trade_id="test_trade_1")
+    actor.handle_event(TradeEvent.ORDER_ACKNOWLEDGED)
+    
+    # Request update
+    actor.handle_event(TradeEvent.STOP_LOSS_UPDATE_REQUESTED, payload={"new_sl": 95.0})
+    assert actor.state == TradeState.MODIFYING
+    
+    # Confirm update
+    actor.handle_event(TradeEvent.STOP_LOSS_UPDATE_CONFIRMED, payload={"confirmed_sl": 95.0})
+    assert actor.state == TradeState.OPEN
+    assert len(actor.history) == 3 # Ack, Request, Confirm

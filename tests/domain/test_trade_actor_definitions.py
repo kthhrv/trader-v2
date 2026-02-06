@@ -17,4 +17,6 @@ def test_trade_events_exist():
     assert TradeEvent.MANUAL_CLOSE_REQUESTED.value == "MANUAL_CLOSE_REQUESTED"
     assert TradeEvent.STOP_LOSS_TRIGGERED.value == "STOP_LOSS_TRIGGERED"
     assert TradeEvent.TAKE_PROFIT_TRIGGERED.value == "TAKE_PROFIT_TRIGGERED"
+    assert TradeEvent.STOP_LOSS_UPDATE_REQUESTED.value == "STOP_LOSS_UPDATE_REQUESTED"
+    assert TradeEvent.STOP_LOSS_UPDATE_CONFIRMED.value == "STOP_LOSS_UPDATE_CONFIRMED"
     assert TradeEvent.CLOSE_FILLED.value == "CLOSE_FILLED"

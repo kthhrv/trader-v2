@@ -16,6 +16,8 @@ class TradeEvent(str, Enum):
     MANUAL_CLOSE_REQUESTED = "MANUAL_CLOSE_REQUESTED"
     STOP_LOSS_TRIGGERED = "STOP_LOSS_TRIGGERED"
     TAKE_PROFIT_TRIGGERED = "TAKE_PROFIT_TRIGGERED"
+    STOP_LOSS_UPDATE_REQUESTED = "STOP_LOSS_UPDATE_REQUESTED"
+    STOP_LOSS_UPDATE_CONFIRMED = "STOP_LOSS_UPDATE_CONFIRMED"
     CLOSE_FILLED = "CLOSE_FILLED"
 
 class TradeActor:
@@ -35,7 +37,13 @@ class TradeActor:
                 TradeEvent.MANUAL_CLOSE_REQUESTED: TradeState.CLOSING,
                 TradeEvent.STOP_LOSS_TRIGGERED: TradeState.CLOSING,
                 TradeEvent.TAKE_PROFIT_TRIGGERED: TradeState.CLOSING,
+                TradeEvent.STOP_LOSS_UPDATE_REQUESTED: TradeState.MODIFYING,
                 TradeEvent.CLOSE_FILLED: TradeState.CLOSED, # Direct close? Maybe unlikely without CLOSING first, but possible
+            },
+            TradeState.MODIFYING: {
+                TradeEvent.STOP_LOSS_UPDATE_CONFIRMED: TradeState.OPEN,
+                TradeEvent.PRICE_UPDATED: TradeState.MODIFYING, # Can still get price updates
+                TradeEvent.STOP_LOSS_TRIGGERED: TradeState.CLOSING, # Can still trigger SL while modifying?
             },
             TradeState.CLOSING: {
                 TradeEvent.CLOSE_FILLED: TradeState.CLOSED,
