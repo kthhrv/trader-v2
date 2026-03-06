@@ -7,6 +7,7 @@ import redis.asyncio as redis
 from app.core.config import settings
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
+from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
 from app.streamer.candle_builder import CandleBuilder
 
@@ -32,6 +33,8 @@ class StreamManager:
             / "stream_service.js"
         )
         self.candle_builder = CandleBuilder()
+        self._notifier = HomeAssistantNotifier()
+        self._alerted_cap: set[str] = set()
         self._processes: List[asyncio.subprocess.Process] = []
 
     async def start(self):
@@ -111,9 +114,18 @@ class StreamManager:
             if elapsed > 60:
                 backoff = INITIAL_BACKOFF_S
                 consecutive_fast_failures = 0
+                self._alerted_cap.discard(epic)
             else:
                 backoff = min(backoff * 2, MAX_BACKOFF_S)
                 consecutive_fast_failures += 1
+
+                if backoff >= MAX_BACKOFF_S and epic not in self._alerted_cap:
+                    self._alerted_cap.add(epic)
+                    await self._notifier.send_notification(
+                        title="Streamer: Max Backoff Reached",
+                        message=f"{epic} has failed repeatedly and hit the {MAX_BACKOFF_S}s backoff cap. Possible IG outage.",
+                        priority="high",
+                    )
 
             logger.info(f"Restarting stream for {epic} in {backoff}s...")
             await asyncio.sleep(backoff)
