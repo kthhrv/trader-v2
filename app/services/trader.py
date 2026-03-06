@@ -66,6 +66,14 @@ class StrategyEngine:
             if signal.action == Action.WAIT:
                 return StrategyResult.WAIT
 
+            # Only trade HIGH/MEDIUM confidence BUY signals
+            if signal.confidence.upper() not in ("HIGH", "MEDIUM") or signal.action != Action.BUY:
+                logger.info(
+                    f"Skipping signal: {signal.action} with confidence {signal.confidence} "
+                    f"(only HIGH/MEDIUM confidence BUY signals allowed)."
+                )
+                return StrategyResult.SKIPPED
+
             # 2. Confirm (Delegated to callback)
             if confirmation_callback:
                 if not confirmation_callback(signal):
