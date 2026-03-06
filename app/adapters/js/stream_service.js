@@ -85,8 +85,8 @@ setInterval(() => {
     const day = now.getUTCDay();    // 0=Sun, 6=Sat
     const hour = now.getUTCHours();
 
-    // Weekend quiet window: Saturday 05:00 UTC -> Sunday 22:00 UTC
-    const isWeekendQuiet = (day === 6 && hour >= 5) || (day === 0 && hour < 22);
+    // Weekend quiet window: Friday 22:00 UTC -> Sunday 22:00 UTC
+    const isWeekendQuiet = (day === 5 && hour >= 22) || (day === 6) || (day === 0 && hour < 22);
     if (isWeekendQuiet) {
         lastTickTime = Date.now(); // Keep resetting so we don't fire on Monday
         return;

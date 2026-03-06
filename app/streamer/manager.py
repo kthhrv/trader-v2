@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 import redis.asyncio as redis
@@ -9,11 +10,13 @@ from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.notification import HomeAssistantNotifier
 from app.core.markets import MARKET_CONFIGS
+from app.services.market_status import MarketStatusService
 from app.streamer.candle_builder import CandleBuilder
 
 # Backoff constants
 INITIAL_BACKOFF_S = 10
 MAX_BACKOFF_S = 300  # 5 minutes cap
+HEALTHY_RUN_THRESHOLD_S = 90
 
 
 class StreamManager:
@@ -34,6 +37,7 @@ class StreamManager:
         )
         self.candle_builder = CandleBuilder()
         self._notifier = HomeAssistantNotifier()
+        self._market_status = MarketStatusService()
         self._alerted_cap: set[str] = set()
         self._processes: List[asyncio.subprocess.Process] = []
 
@@ -70,9 +74,24 @@ class StreamManager:
 
     async def _run_session(self):
         env = settings.DATA_ACCOUNT_ENV
-        logger.info(f"StreamManager authenticating with {env}...")
 
-        await self._ensure_authenticated(env)
+        # Sleep until markets are about to open (avoids weekend/overnight churn)
+        next_start = self._market_status.get_next_streaming_start()
+        if next_start is not None:
+            sleep_seconds = (next_start - datetime.now(timezone.utc)).total_seconds()
+            if sleep_seconds > 0:
+                wake_str = next_start.strftime("%Y-%m-%d %H:%M UTC")
+                logger.info(f"All markets closed. Sleeping until {wake_str} ({sleep_seconds:.0f}s)")
+                await self._notifier.send_notification(
+                    title="Streamer: Sleeping",
+                    message=f"All markets closed. Waking at {wake_str}.",
+                    priority="low",
+                )
+                self._alerted_cap.clear()
+                await asyncio.sleep(sleep_seconds)
+
+        logger.info(f"StreamManager authenticating with {env}...")
+        await self._force_reauth(env)
 
         epics = [config["epic"] for config in MARKET_CONFIGS.values()]
         logger.info(
@@ -89,7 +108,7 @@ class StreamManager:
         """
         Manages a single Node process for one market with exponential backoff retries.
         Re-authenticates only after consecutive fast failures (likely stale tokens).
-        Backoff resets after a process runs successfully for > 60s.
+        Backoff resets after a process runs successfully for > 90s.
         """
         backoff = INITIAL_BACKOFF_S
         consecutive_fast_failures = 0
@@ -111,7 +130,7 @@ class StreamManager:
 
             # Reset backoff if the process ran for a meaningful duration
             elapsed = asyncio.get_event_loop().time() - start_time
-            if elapsed > 60:
+            if elapsed > HEALTHY_RUN_THRESHOLD_S:
                 backoff = INITIAL_BACKOFF_S
                 consecutive_fast_failures = 0
                 self._alerted_cap.discard(epic)

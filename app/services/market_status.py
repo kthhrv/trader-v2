@@ -173,6 +173,66 @@ class MarketStatusService:
 
         return schedule
 
+    def get_next_streaming_start(self, now: datetime | None = None) -> datetime | None:
+        """
+        Returns the UTC time when streaming should resume (earliest market open minus 10 min).
+        Returns None if any market is currently open (streaming should be active now).
+        """
+        now = now or datetime.now(ZoneInfo("UTC"))
+
+        # Check if any market is currently open
+        for _, cfg in MARKET_CONFIGS.items():
+            tz = ZoneInfo(cfg["timezone"])
+            now_local = now.astimezone(tz)
+
+            if now_local.weekday() >= 5:
+                continue
+
+            schedule = self._get_market_hours(cfg["epic"])
+            open_time = datetime.strptime(schedule["open"], "%H:%M").time()
+            close_time = datetime.strptime(schedule["close"], "%H:%M").time()
+
+            if open_time <= now_local.time() <= close_time and not self.is_holiday(cfg["epic"]):
+                return None
+
+        # Find earliest next open across all markets
+        earliest_open: datetime | None = None
+
+        for _, cfg in MARKET_CONFIGS.items():
+            tz = ZoneInfo(cfg["timezone"])
+            now_local = now.astimezone(tz)
+            schedule = self._get_market_hours(cfg["epic"])
+            open_hour, open_minute = map(int, schedule["open"].split(":"))
+
+            # Start from today, check up to 7 days ahead
+            for day_offset in range(8):
+                candidate = now_local.replace(
+                    hour=open_hour, minute=open_minute, second=0, microsecond=0
+                ) + timedelta(days=day_offset)
+
+                # Skip past times
+                if candidate <= now_local:
+                    continue
+
+                # Skip weekends
+                if candidate.weekday() >= 5:
+                    continue
+
+                # Skip holidays
+                if self._is_holiday_season(candidate.date()):
+                    continue
+
+                # Convert to UTC for comparison
+                candidate_utc = candidate.astimezone(ZoneInfo("UTC"))
+                if earliest_open is None or candidate_utc < earliest_open:
+                    earliest_open = candidate_utc
+                break
+
+        if earliest_open is None:
+            return None
+
+        return earliest_open - timedelta(minutes=10)
+
     def get_market_close_datetime(self, epic: str) -> datetime:
         """
         Returns the next market close time as a localized datetime object.
