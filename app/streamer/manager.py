@@ -1,7 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
+from typing import List
 import redis.asyncio as redis
 
 from app.core.config import settings
@@ -9,6 +9,10 @@ from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.core.markets import MARKET_CONFIGS
 from app.streamer.candle_builder import CandleBuilder
+
+# Backoff constants
+INITIAL_BACKOFF_S = 10
+MAX_BACKOFF_S = 300  # 5 minutes cap
 
 
 class StreamManager:
@@ -20,7 +24,6 @@ class StreamManager:
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
         self.ig_client = AsyncIGClient.get_instance()
-        self.process: Optional[asyncio.subprocess.Process] = None
         self.script_path = (
             Path(__file__).parent.parent.parent
             / "app"
@@ -29,6 +32,7 @@ class StreamManager:
             / "stream_service.js"
         )
         self.candle_builder = CandleBuilder()
+        self._processes: List[asyncio.subprocess.Process] = []
 
     async def start(self):
         """
@@ -39,66 +43,80 @@ class StreamManager:
                 await self._run_session()
             except asyncio.CancelledError:
                 logger.info("StreamManager stopping...")
-                await self._stop_process()
+                await self._stop_processes()
                 break
             except Exception as e:
                 logger.error(f"StreamManager crashed: {e}. Restarting in 5s...")
-                await self._stop_process()
+                await self._stop_processes()
                 await asyncio.sleep(5)
 
-    async def _run_session(self):
-        # 1. Authenticate (Get Tokens)
-        env = (
-            settings.DATA_ACCOUNT_ENV
-        )  # Use the dedicated Data account (Live preferred)
-        logger.info(f"StreamManager authenticating with {env}...")
-
+    async def _ensure_authenticated(self, env: str) -> dict:
+        """Authenticate if not already. Returns cached tokens."""
         await self.ig_client.authenticate(env)
         tokens = self.ig_client.auth_tokens.get(env)
         if not tokens:
             raise Exception("Authentication failed (No tokens)")
+        return tokens
 
-        # 2. Prepare Epics
+    async def _force_reauth(self, env: str) -> dict:
+        """Invalidate cached tokens and re-authenticate."""
+        if env in self.ig_client.auth_tokens:
+            del self.ig_client.auth_tokens[env]
+        logger.info(f"Forcing re-authentication for {env}...")
+        return await self._ensure_authenticated(env)
+
+    async def _run_session(self):
+        env = settings.DATA_ACCOUNT_ENV
+        logger.info(f"StreamManager authenticating with {env}...")
+
+        await self._ensure_authenticated(env)
+
         epics = [config["epic"] for config in MARKET_CONFIGS.values()]
-        epics_str = ",".join(epics)
-        logger.info(f"Subscribing to {len(epics)} markets: {epics_str}")
-
-        # 3. Spawn Node Process
-        # Note: The JS script takes a single epic usually. We might need to update the JS script
-        # to handle multiple epics OR spawn multiple processes.
-        # Checking streamer.py: It passes ONE epic to the command.
-        # "node stream_service.js CST XST ACCOUNT EPIC URL"
-
-        # CRITICAL: The current JS script only supports ONE epic per process.
-        # To support 6 markets, we either:
-        # A) Modify JS to accept a list.
-        # B) Spawn 6 Node processes (Heavy).
-        # C) Update JS to subscribe to multiple items (Lightstreamer supports this).
-
-        # For Phase 1, I will implement a loop that spawns a process PER market.
-        # This is inefficient but safest without rewriting the JS adapter immediately.
-        # WAIT: 'market-streamer' is a single service. Running 6 subprocesses is fine.
+        logger.info(
+            f"Subscribing to {len(epics)} markets: {','.join(epics)}"
+        )
 
         tasks = []
         for epic in epics:
-            tasks.append(self._stream_market(epic, tokens, env))
+            tasks.append(self._stream_market(epic, env))
 
         await asyncio.gather(*tasks)
 
-    async def _stream_market(self, epic: str, tokens: dict, env: str):
+    async def _stream_market(self, epic: str, env: str):
         """
-        Manages a single Node process for one market with automatic retries.
+        Manages a single Node process for one market with exponential backoff retries.
+        Re-authenticates only after consecutive fast failures (likely stale tokens).
+        Backoff resets after a process runs successfully for > 60s.
         """
+        backoff = INITIAL_BACKOFF_S
+        consecutive_fast_failures = 0
+
         while True:
+            start_time = asyncio.get_event_loop().time()
             try:
+                # Re-auth after 3 consecutive fast failures (likely stale tokens)
+                if consecutive_fast_failures >= 3:
+                    tokens = await self._force_reauth(env)
+                    consecutive_fast_failures = 0
+                else:
+                    tokens = await self._ensure_authenticated(env)
                 await self._run_market_process(epic, tokens, env)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Error in stream task for {epic}: {e}")
 
-            logger.info(f"Restarting stream for {epic} in 10s...")
-            await asyncio.sleep(10)
+            # Reset backoff if the process ran for a meaningful duration
+            elapsed = asyncio.get_event_loop().time() - start_time
+            if elapsed > 60:
+                backoff = INITIAL_BACKOFF_S
+                consecutive_fast_failures = 0
+            else:
+                backoff = min(backoff * 2, MAX_BACKOFF_S)
+                consecutive_fast_failures += 1
+
+            logger.info(f"Restarting stream for {epic} in {backoff}s...")
+            await asyncio.sleep(backoff)
 
     async def _run_market_process(self, epic: str, tokens: dict, env: str):
         cst = tokens["CST"]
@@ -125,6 +143,7 @@ class StreamManager:
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self.script_path.parent),
         )
+        self._processes.append(process)
 
         # Start stderr reader task
         async def log_stderr(stderr):
@@ -148,7 +167,6 @@ class StreamManager:
 
         stdout_task = asyncio.create_task(read_stdout(process.stdout))
 
-        # Await either task or the process itself
         try:
             return_code = await process.wait()
             logger.warning(f"Node process for {epic} exited with code {return_code}")
@@ -159,6 +177,8 @@ class StreamManager:
                 process.terminate()
             except Exception:
                 pass
+            if process in self._processes:
+                self._processes.remove(process)
 
     async def _process_stream_line(self, line_str: str, epic: str):
         if "[NODE_STREAM_INFO]" in line_str:
@@ -184,6 +204,10 @@ class StreamManager:
         except (json.JSONDecodeError, ValueError) as e:
             logger.debug(f"Failed to parse stream line: {e}")
 
-    async def _stop_process(self):
-        # Todo: Kill all subprocesses
-        pass
+    async def _stop_processes(self):
+        for process in self._processes:
+            try:
+                process.terminate()
+            except Exception:
+                pass
+        self._processes.clear()

@@ -29,12 +29,43 @@ const client = new ls.LightstreamerClient(ls_endpoint, "DEFAULT");
 client.connectionDetails.setUser(account_id);
 client.connectionDetails.setPassword(`CST-${cst}|XST-${xst}`);
 
+// --- Liveness Heartbeat ---
+// If no price update arrives for HEARTBEAT_TIMEOUT_MS, assume the connection is dead.
+const HEARTBEAT_TIMEOUT_MS = 120_000; // 2 minutes
+const RECOVERY_TIMEOUT_MS = 60_000;   // 1 minute max in WILL-RETRY/TRYING-RECOVERY
+let lastTickTime = Date.now();
+let recoveryTimer = null;
+
+function startRecoveryTimer(status) {
+    if (recoveryTimer) return; // Already ticking
+    log_info(`Starting ${RECOVERY_TIMEOUT_MS/1000}s recovery timer (status: ${status})`);
+    recoveryTimer = setTimeout(() => {
+        log_error(`Recovery timeout expired in state: ${status}. Exiting.`);
+        process.exit(1);
+    }, RECOVERY_TIMEOUT_MS);
+}
+
+function clearRecoveryTimer() {
+    if (recoveryTimer) {
+        clearTimeout(recoveryTimer);
+        recoveryTimer = null;
+    }
+}
+
 client.addListener({
   onStatusChange: function(newStatus) {
     log_info("[LS Status]: " + newStatus);
-    if (newStatus === "DISCONNECTED") {
+
+    if (newStatus.startsWith("CONNECTED:")) {
+        clearRecoveryTimer();
+    } else if (newStatus === "DISCONNECTED") {
         log_error("Lightstreamer disconnected. Exiting.");
-        process.exit(1); // Exit so Python can restart us
+        process.exit(1);
+    } else if (newStatus === "STALLED") {
+        log_error("Lightstreamer stalled (no data from server). Exiting.");
+        process.exit(1);
+    } else if (newStatus.startsWith("DISCONNECTED:WILL-RETRY") || newStatus.startsWith("DISCONNECTED:TRYING-RECOVERY")) {
+        startRecoveryTimer(newStatus);
     }
   },
   onServerError: function(code, msg) {
@@ -47,6 +78,27 @@ client.addListener({
 
 client.connect();
 
+// Heartbeat check: exit if no ticks received for HEARTBEAT_TIMEOUT_MS.
+// Disabled on weekends (Sat ~05:00 UTC to Sun ~22:00 UTC) when IG sends no ticks.
+setInterval(() => {
+    const now = new Date();
+    const day = now.getUTCDay();    // 0=Sun, 6=Sat
+    const hour = now.getUTCHours();
+
+    // Weekend quiet window: Saturday 05:00 UTC -> Sunday 22:00 UTC
+    const isWeekendQuiet = (day === 6 && hour >= 5) || (day === 0 && hour < 22);
+    if (isWeekendQuiet) {
+        lastTickTime = Date.now(); // Keep resetting so we don't fire on Monday
+        return;
+    }
+
+    const elapsed = Date.now() - lastTickTime;
+    if (elapsed > HEARTBEAT_TIMEOUT_MS) {
+        log_error(`No ticks received for ${Math.round(elapsed/1000)}s. Exiting.`);
+        process.exit(1);
+    }
+}, 30_000);
+
 // --- Subscription 1: Market Data (MERGE) ---
 const priceSub = new ls.Subscription("MERGE", [`L1:${epic}`], ["BID", "OFFER", "UPDATE_TIME", "MARKET_STATE"]);
 
@@ -58,6 +110,7 @@ priceSub.addListener({
     const market_state = update.getValue("MARKET_STATE");
 
     if (bidRaw && offerRaw) {
+        lastTickTime = Date.now();
         const bid = parseFloat(bidRaw);
         const offer = parseFloat(offerRaw);
 
@@ -124,5 +177,4 @@ tradeSub.addListener({
 
 client.subscribe(tradeSub);
 
-// Keep process alive indefinitely
-setInterval(() => {}, 1000);
+// Process kept alive by the heartbeat setInterval above.
