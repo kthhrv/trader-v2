@@ -16,6 +16,7 @@ services:
       - RUNNING_IN_DOCKER=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    mem_limit: 512m
 
   watcher:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
@@ -34,6 +35,7 @@ services:
       - RUNNING_IN_DOCKER=true
     depends_on:
       - trader
+    mem_limit: 256m
 
   ui:
     image: ${REGISTRY_URL:-localhost:5000}/${IMAGE_NAME:-trader-v2}:${IMAGE_TAG:-latest}
@@ -54,5 +56,8 @@ services:
     environment:
       - API_URL=http://192.168.0.191:${UI_API_PORT:-8020}
       - REFLEX_API_URL=http://192.168.0.191:${UI_API_PORT:-8020}
+      - NODE_OPTIONS=--max-old-space-size=1024
     depends_on:
       - trader
+    mem_limit: 1536m
+    oom_score_adj: 500

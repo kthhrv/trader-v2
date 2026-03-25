@@ -15,6 +15,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    mem_limit: 512m
 
   promtail:
     image: grafana/promtail:latest
@@ -30,6 +31,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    mem_limit: 128m
 
   grafana:
     image: grafana/grafana:latest
@@ -52,6 +54,7 @@ services:
         max-file: "3"
     depends_on:
       - loki
+    mem_limit: 256m
 
   prometheus:
     image: prom/prometheus:latest
@@ -71,6 +74,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    mem_limit: 512m
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -89,6 +93,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    mem_limit: 64m
 
 volumes:
   loki-data:

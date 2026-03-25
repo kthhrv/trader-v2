@@ -13,3 +13,4 @@ services:
       - ${ENV_FILE:-.env}
     environment:
       - RUNNING_IN_DOCKER=true
+    mem_limit: 128m
