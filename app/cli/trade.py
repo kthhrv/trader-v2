@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 import pandas as pd
 from sqlmodel import select
+from app.core.config import settings
 from app.core.logger import logger
 from app.adapters.ig_client import AsyncIGClient
 from app.adapters.gemini_service import Action, TradingSignal, EntryType
@@ -41,7 +42,7 @@ async def run_sync_trade(deal_id: str):
         logger.info(f"Looking for closure of {epic} (Deal {deal_id})...")
 
         async with AsyncIGClient.get_instance() as client:
-            await client.authenticate()
+            await client.authenticate(env_type=settings.TRADING_ACCOUNT_ENV)
 
             # 2. Fetch History
             try:
