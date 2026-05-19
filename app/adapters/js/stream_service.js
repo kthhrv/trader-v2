@@ -100,7 +100,9 @@ setInterval(() => {
 }, 30_000);
 
 // --- Subscription 1: Market Data (MERGE) ---
-const priceSub = new ls.Subscription("MERGE", [`L1:${epic}`], ["BID", "OFFER", "UPDATE_TIME", "MARKET_STATE"]);
+// IG's LS adapter uses MARKET:<epic>; the older L1:<epic> group is now
+// rejected with "21 Invalid group".
+const priceSub = new ls.Subscription("MERGE", [`MARKET:${epic}`], ["BID", "OFFER", "UPDATE_TIME", "MARKET_STATE"]);
 
 priceSub.addListener({
   onItemUpdate: function(update) {
