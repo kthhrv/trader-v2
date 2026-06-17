@@ -100,16 +100,21 @@ setInterval(() => {
 }, 30_000);
 
 // --- Subscription 1: Market Data (MERGE) ---
-// IG's LS adapter uses MARKET:<epic>; the older L1:<epic> group is now
-// rejected with "21 Invalid group".
-const priceSub = new ls.Subscription("MERGE", [`MARKET:${epic}`], ["BID", "OFFER", "UPDATE_TIME", "MARKET_STATE"]);
+// IG migrated market-data streaming from MARKET:<epic> (DEFAULT adapter) to
+// PRICE:<accountId>:<epic> on the "Pricing" data adapter. The old MARKET
+// subscription is being decommissioned per-instrument (daily/cash indices
+// stopped delivering on 2026-06-15). Field renames: BID->BIDPRICE1,
+// OFFER->ASKPRICE1, UPDATE_TIME->TIMESTAMP (UTC ms epoch),
+// MARKET_STATE->DLG_FLAG (values change, e.g. TRADEABLE->DEAL).
+const priceSub = new ls.Subscription("MERGE", [`PRICE:${account_id}:${epic}`], ["BIDPRICE1", "ASKPRICE1", "TIMESTAMP", "DLG_FLAG"]);
+priceSub.setDataAdapter("Pricing");
 
 priceSub.addListener({
   onItemUpdate: function(update) {
-    const bidRaw = update.getValue("BID");
-    const offerRaw = update.getValue("OFFER");
-    const update_time = update.getValue("UPDATE_TIME");
-    const market_state = update.getValue("MARKET_STATE");
+    const bidRaw = update.getValue("BIDPRICE1");
+    const offerRaw = update.getValue("ASKPRICE1");
+    const update_time = update.getValue("TIMESTAMP");
+    const market_state = update.getValue("DLG_FLAG");
 
     if (bidRaw && offerRaw) {
         lastTickTime = Date.now();
