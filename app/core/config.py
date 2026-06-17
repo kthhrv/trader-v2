@@ -49,6 +49,7 @@ class Settings(BaseSettings):
 
     # --- External Services ---
     GEMINI_API_KEY: SecretStr
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
 
     # --- Redis ---
     REDIS_HOST: str = "redis"

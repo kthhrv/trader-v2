@@ -72,8 +72,8 @@ class GeminiService:
     Uses structured outputs and thinking (Reasoning) models.
     """
 
-    def __init__(self, model_name: str = "gemini-3-flash-preview"):
-        self.model_name = model_name
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = model_name or settings.GEMINI_MODEL
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY.get_secret_value())
 
     @retry(
