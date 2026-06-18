@@ -110,3 +110,12 @@ async def test_streamer_force_reauth_uses_shared_session(httpx_mock, monkeypatch
     assert tokens == {"CST": "SC", "X-SECURITY-TOKEN": "SX"}
     assert httpx_mock.get_requests() == []  # sidecar feed never POSTed /session
     await mgr.ig_client.close()
+
+
+@pytest.mark.asyncio
+async def test_close_releases_shared_session_redis(monkeypatch):
+    monkeypatch.setattr(igmod.settings, "IG_SHARED_SESSION_URL", "redis://x:6387")
+    monkeypatch.setattr(igmod.redis, "from_url", lambda *a, **k: AsyncMock())
+    client = AsyncIGClient()
+    await client.close()
+    client.session_redis.aclose.assert_awaited_once()

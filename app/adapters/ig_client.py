@@ -54,6 +54,7 @@ class AsyncIGClient:
         # Shared igsession session: when IG_SHARED_SESSION_URL is set, tokens are
         # READ from that Redis instead of POSTing /session, so V2 shares the one IG
         # login held by igsession. Empty = legacy self-auth (current behaviour).
+        # Read-only mirror of V3's flag — V2 only reads the shared session, never writes/locks it.
         self.session_redis: Optional[redis.Redis] = (
             redis.from_url(settings.IG_SHARED_SESSION_URL, decode_responses=True)
             if settings.IG_SHARED_SESSION_URL
@@ -72,6 +73,8 @@ class AsyncIGClient:
         for session in self.sessions.values():
             await session.aclose()
         self.sessions = {}
+        if self.session_redis is not None:
+            await self.session_redis.aclose()
 
     def _normalize_env(self, env_type: str) -> str:
         """Handles fallback from LIVE to DEMO if credentials are missing."""

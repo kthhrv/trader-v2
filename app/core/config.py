@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # --- Shared IG session (igsession service) ---
     # When set, V2 READS its IG session tokens from the igsession session Redis
     # (env-namespaced) instead of authenticating itself. Empty = legacy self-auth
-    # (current behaviour). Mirrors V3's flag.
+    # (current behaviour). Read-only mirror of V3's flag — V2 only reads the shared session, never writes/locks it.
     IG_SHARED_SESSION_URL: str = Field(default="", alias="IG_SHARED_SESSION_URL")
     # Environment name that namespaces the shared session keys (matches igsession).
     APP_ENV: str = Field(default="live", alias="APP_ENV")
