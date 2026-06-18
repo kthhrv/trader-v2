@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     )
     IG_LIVE_ACC_ID: Optional[str] = Field(default=None, alias="IG_LIVE_ACC_ID")
 
+    # --- Shared IG session (igsession service) ---
+    # When set, V2 READS its IG session tokens from the igsession session Redis
+    # (env-namespaced) instead of authenticating itself. Empty = legacy self-auth
+    # (current behaviour). Mirrors V3's flag.
+    IG_SHARED_SESSION_URL: str = Field(default="", alias="IG_SHARED_SESSION_URL")
+    # Environment name that namespaces the shared session keys (matches igsession).
+    APP_ENV: str = Field(default="live", alias="APP_ENV")
+
     # --- Account Selection ---
     # Select which account is used for Executing Trades
     TRADING_ACCOUNT_ENV: Literal["DEMO", "LIVE"] = "DEMO"
