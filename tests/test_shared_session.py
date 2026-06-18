@@ -92,3 +92,21 @@ async def test_flag_on_missing_tokens_raises(monkeypatch):
     with pytest.raises(IGAuthenticationError):
         await client.authenticate("LIVE")
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_streamer_force_reauth_uses_shared_session(httpx_mock, monkeypatch):
+    monkeypatch.setattr(igmod.settings, "IG_SHARED_SESSION_URL", "redis://x:6387")
+    monkeypatch.setattr(igmod.settings, "APP_ENV", "live")
+    monkeypatch.setattr(igmod.redis, "from_url", lambda *a, **k: AsyncMock())
+
+    mgr = StreamManager(MagicMock())  # __init__ builds the shared-session singleton
+    mgr.ig_client.session_redis.get = AsyncMock(
+        return_value=json.dumps({"cst": "SC", "xst": "SX"})
+    )
+
+    tokens = await mgr._force_reauth("LIVE")
+
+    assert tokens == {"CST": "SC", "X-SECURITY-TOKEN": "SX"}
+    assert httpx_mock.get_requests() == []  # sidecar feed never POSTed /session
+    await mgr.ig_client.close()
