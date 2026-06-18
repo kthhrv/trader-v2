@@ -1,7 +1,9 @@
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Any
 import httpx
+import redis.asyncio as redis
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -49,6 +51,15 @@ class AsyncIGClient:
         self.auth_tokens: Dict[str, Dict[str, str]] = {}
         self.current_account_id: Optional[str] = None
         self._lock = asyncio.Lock()
+        # Shared igsession session: when IG_SHARED_SESSION_URL is set, tokens are
+        # READ from that Redis instead of POSTing /session, so V2 shares the one IG
+        # login held by igsession. Empty = legacy self-auth (current behaviour).
+        self.session_redis: Optional[redis.Redis] = (
+            redis.from_url(settings.IG_SHARED_SESSION_URL, decode_responses=True)
+            if settings.IG_SHARED_SESSION_URL
+            else None
+        )
+        self.session_env: str = settings.APP_ENV
 
     async def __aenter__(self):
         return self
@@ -88,6 +99,33 @@ class AsyncIGClient:
             )
         return settings.IG_DEMO_API_KEY.get_secret_value()
 
+    async def _load_shared_session(
+        self, env_type: str, client: httpx.AsyncClient
+    ) -> None:
+        """Read IG session tokens from the shared igsession Redis (env-namespaced)
+        and apply them to the cache + session headers, instead of POSTing /session.
+        igsession owns the one login; this NEVER authenticates."""
+        key = f"ig_session:{self.session_env}:tokens"
+        raw = await self.session_redis.get(key)
+        if not raw:
+            raise IGAuthenticationError(f"No shared IG session at {key}")
+        tokens = json.loads(raw)
+        cst, xst = tokens.get("cst"), tokens.get("xst")
+        if not cst or not xst:
+            raise IGAuthenticationError(f"Shared IG session at {key} missing cst/xst")
+        self.auth_tokens[env_type] = {"CST": cst, "X-SECURITY-TOKEN": xst}
+        client.headers.update({"CST": cst, "X-SECURITY-TOKEN": xst})
+        creds = (
+            settings._get_live_credentials()
+            if env_type == "LIVE"
+            else settings._get_demo_credentials()
+        )
+        self.current_account_id = creds["acc_id"]
+        logger.info(
+            f"Loaded shared IG session ({env_type}) from {key}. "
+            f"Account: {self.current_account_id}"
+        )
+
     async def authenticate(self, env_type: str = "DEMO"):
         """
         Authenticates against the specified IG environment.
@@ -103,6 +141,11 @@ class AsyncIGClient:
             # Clear old tokens if any to ensure a clean login request
             client.headers.pop("CST", None)
             client.headers.pop("X-SECURITY-TOKEN", None)
+
+            # Shared session: read igsession's tokens, never POST /session.
+            if self.session_redis is not None:
+                await self._load_shared_session(env_type, client)
+                return
 
             creds = (
                 settings._get_live_credentials()
