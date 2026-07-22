@@ -493,10 +493,27 @@ class AsyncIGClient:
 
         now = datetime.now(timezone.utc)
         start = now - timedelta(seconds=max_span_seconds)
-        from_str = start.strftime("%Y-%m-%dT%H:%M:%S")
-        to_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+        # IG reads from/to in the ACCOUNT's timezone, not UTC (documented: the
+        # API returns `timezoneOffset` for exactly this reason). Naive UTC
+        # strings shift the whole window back by the offset and hide the most
+        # recent hour of activity, so _sync_outcome cannot find a close until
+        # an hour after it happened — and it only retries for ~30s. Latent
+        # since this was written; it started biting when the account offset
+        # stopped being 0 (2026-07-08..07-21). Pad past any real-world offset
+        # (max +14:00) rather than compensate for a specific one, so this stays
+        # correct if the account timezone changes again.
+        margin = timedelta(hours=14)
+        from_str = (start - margin).strftime("%Y-%m-%dT%H:%M:%S")
+        to_str = (now + margin).strftime("%Y-%m-%dT%H:%M:%S")
 
-        params: Dict[str, Any] = {"detailed": "true", "from": from_str, "to": to_str}
+        params: Dict[str, Any] = {
+            "detailed": "true",
+            "from": from_str,
+            "to": to_str,
+            # v3 defaults to 50/page and nothing here walks paging.next; the
+            # padded window measured 65 rows on the sibling account.
+            "pageSize": "500",
+        }
 
         if deal_id:
             # Note: IG API V3 docs say dealId filter is supported
